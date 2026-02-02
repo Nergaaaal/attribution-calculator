@@ -480,3 +480,125 @@ function renderAttributionInsights(weightedScore, uShape) {
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', init);
+
+
+// -------------------------------------------------------------
+// SIMULATION DASHBOARD LOGIC (AI MODEL)
+// -------------------------------------------------------------
+
+document.getElementById('runSimulationBtn').addEventListener('click', runSimulation);
+
+function runSimulation() {
+    const btn = document.getElementById('runSimulationBtn');
+    const thresholdInput = document.getElementById('simThreshold');
+    const resultsDiv = document.getElementById('simulationResults');
+    const threshold = parseInt(thresholdInput.value) || 60;
+
+    // UI Feedback
+    btn.innerHTML = '<span class="icon">⏳</span> Генерирую данные...';
+    btn.disabled = true;
+    btn.classList.remove('pulse-btn');
+
+    // Simulate async work
+    setTimeout(() => {
+        // 1. Generate Synthetic Data
+        const journeys = generateSyntheticData(8000);
+
+        // 2. Calculate Models
+        const legacyResults = calculateBatchAttribution(journeys, 'legacy', threshold);
+        const smartResults = calculateBatchAttribution(journeys, 'smart', threshold);
+
+        // 3. Render Results
+        resultsDiv.classList.remove('hidden');
+        renderSimulationMetrics(legacyResults, smartResults, threshold);
+        renderSimulationChart(legacyResults, smartResults);
+
+        // Reset UI
+        btn.innerHTML = '<span class="icon">🚀</span> Запустить Симуляцию';
+        btn.disabled = false;
+
+        // Scroll to results
+        resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    }, 500);
+}
+
+function generateSyntheticData(count) {
+    const channelIds = channels.map(c => c.id); // digital, stories, etc
+    const dataset = [];
+
+    for (let i = 0; i < count; i++) {
+        // Random length 2-6
+        const len = Math.floor(Math.random() * 5) + 2;
+        const journey = [];
+
+        for (let j = 0; j < len; j++) {
+            journey.push(channelIds[Math.floor(Math.random() * channelIds.length)]);
+        }
+
+        let timeToConvert = 0;
+        let amount = Math.floor(Math.random() * 49000) + 1000;
+
+        // BIAS: 30% chance fast conversion with Stories as last touch
+        if (Math.random() < 0.30) {
+            journey[journey.length - 1] = 'stories';
+            timeToConvert = Math.floor(Math.random() * 55) + 5; // 5-60 sec
+        } else {
+            timeToConvert = Math.floor(Math.random() * 80000) + 120; // > 2 min
+            // Less chance for stories last touch naturally
+            if (journey[journey.length - 1] === 'stories' && Math.random() < 0.5) {
+                journey[journey.length - 1] = 'digital';
+            }
+        }
+
+        dataset.push({ journey, timeToConvert, amount });
+    }
+    return dataset;
+}
+
+function calculateBatchAttribution(dataset, modelType, threshold) {
+    const totals = {};
+    channels.forEach(c => totals[c.id] = 0);
+    let filteredCount = 0;
+
+    dataset.forEach(row => {
+        let path = [...row.journey];
+        const revenue = row.amount;
+
+        if (modelType === 'smart') {
+            const lastTouch = path[path.length - 1];
+            if (lastTouch === 'stories' && row.timeToConvert < threshold) {
+                // Navigation Bias - Exclude last touch
+                path.pop();
+                filteredCount++;
+            }
+        }
+
+        if (path.length === 0) return; // All filtered out
+
+        if (modelType === 'legacy') {
+            // Last Touch
+            const winner = path[path.length - 1];
+            totals[winner] += revenue;
+        } else if (modelType === 'smart') {
+            // U-Shape (40/40/20)
+            const n = path.length;
+            if (n === 1) {
+                totals[path[0]] += revenue;
+            } else if (n === 2) {
+                totals[path[0]] += revenue * 0.5;
+                totals[path[1]] += revenue * 0.5;
+            } else {
+                totals[path[0]] += revenue * 0.4; // First
+                totals[path[path.length - 1]] += revenue * 0.4; // Last
+
+                const middleShare = (revenue * 0.2) / (n - 2);
+                for (let k = 1; k < n - 1; k++) {
+                    totals[path[k]] += middleShare;
+                }
+            }
+        }
+    });
+
+    return { totals, filteredCount };
+}
