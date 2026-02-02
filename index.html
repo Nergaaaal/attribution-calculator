@@ -122,7 +122,54 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Simulation Dashboard Section -->
+    <div class="simulation-section">
+        <div class="simulation-header">
+            <h2>🤖 Симуляция Данных (AI Model)</h2>
+            <p>Сгенерируйте 8,000 виртуальных цепочек чтобы проверить гипотезу "Navigation Bias"</p>
+        </div>
+
+        <div class="simulation-controls">
+            <button id="runSimulationBtn" class="primary-btn pulse-btn">
+                <span class="icon">🚀</span> Запустить Симуляцию
+            </button>
+            <div class="sim-settings">
+                <label>
+                    <span class="icon">⏱️</span> Порог времени (Stories):
+                    <input type="number" id="simThreshold" value="60" min="0" max="300" step="10"> сек
+                </label>
+            </div>
+        </div>
+
+        <div id="simulationResults" class="simulation-results hidden">
+            <div class="metrics-grid">
+                <div class="metric-card negative">
+                    <h3>Stories (Legacy)</h3>
+                    <div class="metric-value" id="legacyStories">0</div>
+                    <div class="metric-label">Last Touch Model</div>
+                </div>
+                <div class="metric-arrow">⬇️ <span id="storiesDiff">0%</span></div>
+                <div class="metric-card positive">
+                    <h3>Stories (Smart)</h3>
+                    <div class="metric-value" id="smartStories">0</div>
+                    <div class="metric-label">Smart Model</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="simChart"></canvas>
+            </div>
+
+            <div class="insight-box">
+                <p>📉 <strong>Инсайт:</strong> Умная модель отсеяла <span id="filteredCount" class="highlight">0</span>
+                    конверсий, где Stories были просто навигацией (менее <span id="thresholdDisplay">60</span> сек).</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js?v=1.1" defer></script>
 </body>
 
 </html>
