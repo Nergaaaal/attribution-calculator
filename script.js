@@ -352,7 +352,6 @@ function runAdvancedSimulation() {
     const totalSimCount = parseInt(inputCount.value) || 8000;
     const applyStoriesLogic = checkStories.checked;
     const applyOfflineLogic = checkOffline.checked;
-    const applyStrictOne = document.getElementById('simStrictOne').checked;
 
     btn.innerHTML = 'Моделирование...';
     btn.disabled = true;
@@ -363,17 +362,10 @@ function runAdvancedSimulation() {
 
         // 2. Apply Filters
         let filteredJourneys = fullJourneys;
-
-        // A. Channel Filters (Combinations)
         if (selectedSimFilters.length > 0) {
             filteredJourneys = fullJourneys.filter(item => {
                 return selectedSimFilters.every(filterId => item.path.includes(filterId));
             });
-        }
-
-        // B. Strict Mode (Only Length 1)
-        if (applyStrictOne) {
-            filteredJourneys = filteredJourneys.filter(item => item.path.length === 1);
         }
 
         const filteredCount = filteredJourneys.length;
@@ -421,7 +413,7 @@ function runAdvancedSimulation() {
 
         renderComparisonBars(results, filteredCount);
         renderTopScenariosTable(topPaths);
-        renderAdvancedInsights(results, applyStoriesLogic, applyOfflineLogic);
+        renderAdvancedInsights(results, applyStoriesLogic, applyOfflineLogic, filteredJourneys);
 
         btn.innerHTML = '<span class="arrow">▶</span> Смоделировать';
         btn.disabled = false;
@@ -443,15 +435,24 @@ function generateRealisticJourneys(count) {
         let journey = [];
         const rand = Math.random();
 
+        // 20% - The "Problem" path (Push -> Stories -> Offline)
         if (rand < 0.20) {
             journey = ['push', 'stories', 'offline'];
         }
+        // 15% - Digital -> Stories -> Telemarketing
         else if (rand < 0.35) {
             journey = ['digital', 'stories', 'telemarketing'];
         }
-        else if (rand < 0.50) {
+        // 10% - Digital -> Offline
+        else if (rand < 0.45) {
             journey = ['digital', 'offline'];
         }
+        // 15% - PURE Single Channel (Direct)
+        else if (rand < 0.60) {
+            const randomCh = channelIds[Math.floor(Math.random() * channelIds.length)];
+            journey = [randomCh];
+        }
+        // Others - Random Mixed (2-4 steps)
         else {
             const len = Math.floor(Math.random() * 3) + 2;
             for (let j = 0; j < len; j++) {
@@ -461,6 +462,63 @@ function generateRealisticJourneys(count) {
         dataset.push({ path: journey });
     }
     return dataset;
+}
+
+// ... calculation functions ...
+
+function renderAdvancedInsights(results, storiesLogic, offlineLogic, filteredJourneys) {
+    const container = document.getElementById('simInsightText');
+    let htmlContent = '';
+
+    // 1. SOLO vs MIXED STATS (If 1 filter active)
+    if (selectedSimFilters.length === 1 && filteredJourneys) {
+        const filterId = selectedSimFilters[0];
+        const filterName = getChannelName(filterId);
+
+        const total = filteredJourneys.length;
+        const soloCount = filteredJourneys.filter(j => j.path.length === 1 && j.path[0] === filterId).length;
+        const mixedCount = total - soloCount;
+
+        const soloPercent = ((soloCount / total) * 100).toFixed(1);
+        const mixedPercent = ((mixedCount / total) * 100).toFixed(1);
+
+        htmlContent += `
+            <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">
+                <strong>Анализ канала ${filterName}:</strong><br>
+                • Чистые продажи (Solo): <b>${soloCount}</b> (${soloPercent}%)<br>
+                • В связке (Mix): <b>${mixedCount}</b> (${mixedPercent}%)
+            </div>
+        `;
+    }
+
+    // 2. MODEL COMPARISON INSIGHT
+    const tmId = 'telemarketing';
+    const tmWeighted = results.weighted[tmId] || 0;
+    const tmUShape = results.uShape[tmId] || 0;
+
+    let diffText = '';
+
+    if (tmWeighted > tmUShape) {
+        let diff = 0;
+        if (tmUShape > 0) diff = ((tmWeighted - tmUShape) / tmUShape) * 100;
+        else diff = 100;
+        diffText = `Ваша модель "Score" присваивает Телемаркетингу (TM) на <strong>${diff.toFixed(0)}% больше продаж</strong>, чем U-Shape. Это происходит из-за высокого балла (5).`;
+    } else {
+        diffText = `Ваша модель показывает схожие результаты с U-Shape.`;
+    }
+
+    htmlContent += diffText;
+
+    const logicText = storiesLogic ?
+        `<br><br>Логика "Stories < 1h" работает: часть касаний сторис была исключена (score=0), что перераспределило вес на другие каналы.` :
+        `<br><br>Логика "Stories < 1h" выключена.`;
+
+    htmlContent += logicText;
+
+    container.innerHTML = htmlContent;
+
+    document.getElementById('insightStoriesScore').innerText = storiesLogic ? '0' : 'Current';
+    document.getElementById('insightOfflineScore').innerText = offlineLogic ? '2' : 'Current';
 }
 
 function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
