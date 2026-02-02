@@ -635,6 +635,11 @@ function renderComparisonBars(results, totalScaleBase) {
         const valWeighted = Math.round(results.weighted[id] || 0);
         const valUShape = Math.round(results.uShape[id] || 0);
 
+        // LOGIC FIX: If channel has 0 contribution in all models, HIDE it.
+        if (valLast === 0 && valWeighted === 0 && valUShape === 0) {
+            return; // Skip this channel
+        }
+
         const wLast = Math.min((valLast / totalScaleBase) * 100, 100);
         const wWeighted = Math.min((valWeighted / totalScaleBase) * 100, 100);
         const wUShape = Math.min((valUShape / totalScaleBase) * 100, 100);

@@ -230,6 +230,11 @@ body {
     border-radius: 12px;
     padding: 16px;
     overflow-y: auto;
+    /* Added Flex behavior for direct children */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-content: flex-start;
 }
 
 .empty-state {
@@ -242,12 +247,7 @@ body {
     padding: 20px;
 }
 
-.journey-steps {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 12px;
-}
+/* .journey-steps removed - styles moved to .journey-path container */
 
 .journey-step {
     display: flex;
