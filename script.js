@@ -46,8 +46,9 @@ function renderChannels() {
                 <input 
                     type="number" 
                     value="${channel.score}" 
-                    min="1" 
+                    min="0.1" 
                     max="10"
+                    step="0.1"
                     data-channel-id="${channel.id}"
                     onchange="updateChannelScore('${channel.id}', this.value)"
                 >
@@ -62,7 +63,7 @@ function renderChannels() {
 function updateChannelScore(channelId, newScore) {
     const channel = channels.find(c => c.id === channelId);
     if (channel) {
-        channel.score = parseInt(newScore);
+        channel.score = parseFloat(newScore);
         renderJourney(); // Re-render journey to update displayed scores
         updateAllResults();
     }
