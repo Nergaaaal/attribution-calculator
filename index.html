@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing Attribution Calculator</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Left Panel -->
+        <div class="left-panel">
+            <!-- Channel Configuration (Top) -->
+            <div class="config-section">
+                <div class="section-header">
+                    <span class="icon">⚙️</span>
+                    <h2>Настройка баллов (CONFIG)</h2>
+                </div>
+
+                <div class="channels-grid" id="channelsGrid">
+                    <!-- Channels will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- Customer Journey (Bottom) -->
+            <div class="journey-section">
+                <div class="section-header">
+                    <span class="icon">📈</span>
+                    <h2>Путь клиента</h2>
+                    <button class="clear-btn" id="clearJourney">Очистить</button>
+                </div>
+
+                <div class="journey-path" id="journeyPath">
+                    <div class="empty-state">
+                        <p>Выберите каналы из списка выше, чтобы построить путь клиента</p>
+                    </div>
+                </div>
+
+                <div class="total-score">
+                    <span>Effective Total Score:</span>
+                    <span class="score-value" id="totalScore">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Attribution Results -->
+        <div class="right-panel">
+            <div class="results-header">
+                <span class="icon">📊</span>
+                <h1>Результаты Атрибуции</h1>
+            </div>
+
+            <!-- Weighted Score Model -->
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">📊</span>
+                    <div>
+                        <h3>Ваша модель (Weighted Score)</h3>
+                        <p class="model-subtitle">Доля = Балл канала / Сумма баллов</p>
+                    </div>
+                </div>
+
+                <div class="results-list" id="weightedResults">
+                    <!-- Results will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- U-Shape Model -->
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">🏔️</span>
+                    <div>
+                        <h3>U-Shape (Position Based)</h3>
+                        <p class="model-subtitle">40% Первому / 40% Последнему / 20% Середине</p>
+                    </div>
+                </div>
+
+                <div class="results-list" id="ushapeResults">
+                    <!-- Results will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- Last Touch Model -->
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">👆</span>
+                    <div>
+                        <h3>Last Touch</h3>
+                        <p class="model-subtitle">100% последнему каналу</p>
+                    </div>
+                </div>
+
+                <div class="results-list" id="lastTouchResults">
+                    <!-- Results will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- First Touch Model -->
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">🎯</span>
+                    <div>
+                        <h3>First Touch</h3>
+                        <p class="model-subtitle">100% первому каналу</p>
+                    </div>
+                </div>
+
+                <div class="results-list" id="firstTouchResults">
+                    <!-- Results will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- Attribution Insights -->
+            <div class="attribution-insights" id="attributionInsights">
+                <!-- Insights will be dynamically generated -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
