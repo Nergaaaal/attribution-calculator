@@ -93,11 +93,13 @@ function renderJourney() {
         totalScore += channel.score;
 
         const node = document.createElement('div');
-        node.className = 'journey-node';
+        node.className = 'journey-step';
         node.innerHTML = `
-            <div class="node-icon channel-${channel.color}">${channel.icon}</div>
-            <div class="node-name">${channel.name}</div>
-            <div class="node-score">${channel.score}</div>
+            <div class="step-icon channel-${channel.color}">${channel.icon}</div>
+            <div class="step-info">
+                <div class="step-name">${channel.name}</div>
+                <div class="step-description">Score: ${channel.score}</div>
+            </div>
             ${index < journey.length - 1 ? '<div class="arrow">→</div>' : ''}
             <button class="remove-node" onclick="removeFromJourney(${index})">×</button>
         `;
@@ -344,6 +346,9 @@ function runAdvancedSimulation() {
     const filterCheckboxes = document.querySelectorAll('.sim-channel-filters input:checked');
     const filterChannels = Array.from(filterCheckboxes).map(cb => cb.value);
 
+    // Strict Match
+    const strictMatch = document.getElementById('simStrictMatch').checked;
+
     // Filter Chips UI active state
     document.querySelectorAll('.filter-chip').forEach(label => {
         const input = label.querySelector('input');
@@ -360,12 +365,23 @@ function runAdvancedSimulation() {
         // 1. Generate Realistic Data (Full Set)
         const fullJourneys = generateRealisticJourneys(count);
 
-        // 2. Filter Data (Intersection Logic)
+        // 2. Filter Data (Intersection Logic or Strict)
         let activeJourneys = fullJourneys;
         if (filterChannels.length > 0) {
             activeJourneys = fullJourneys.filter(row => {
-                // Check if path contains ALL selected filter channels
-                return filterChannels.every(filterId => row.path.includes(filterId));
+                const pathIds = row.path;
+
+                if (strictMatch) {
+                    // Strict: Path must contain ALL filter channels AND NO others
+                    // But order usually doesn't matter for "Exact Set", or does it? 
+                    // Let's assume Set Equality.
+                    if (pathIds.length !== filterChannels.length) return false;
+                    // Check if every item in path is in filter (and lengths equal implies set equality)
+                    return pathIds.every(id => filterChannels.includes(id));
+                } else {
+                    // Normal Intersection: Path must contain ALL filter channels
+                    return filterChannels.every(filterId => pathIds.includes(filterId));
+                }
             });
         }
 
