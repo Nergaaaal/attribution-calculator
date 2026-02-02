@@ -602,3 +602,90 @@ function calculateBatchAttribution(dataset, modelType, threshold) {
 
     return { totals, filteredCount };
 }
+
+let simChartInstance = null;
+
+function renderSimulationMetrics(legacy, smart, threshold) {
+    // Stories Impact
+    const legStories = legacy.totals['stories'];
+    const smartStories = smart.totals['stories'];
+    const diff = legStories > 0 ? ((smartStories - legStories) / legStories) * 100 : 0;
+
+    // Formatting
+    const fmt = (num) => '$' + (num / 1000000).toFixed(1) + 'M';
+
+    document.getElementById('legacyStories').innerText = fmt(legStories);
+    document.getElementById('smartStories').innerText = fmt(smartStories);
+    document.getElementById('storiesDiff').innerText = Math.round(diff) + '%';
+
+    // filtered count
+    document.getElementById('filteredCount').innerText = smart.filteredCount.toLocaleString();
+    document.getElementById('thresholdDisplay').innerText = threshold;
+}
+
+function renderSimulationChart(legacy, smart) {
+    const ctx = document.getElementById('simChart').getContext('2d');
+
+    // Prepare data
+    const labels = channels.map(c => c.name);
+    const legacyData = channels.map(c => legacy.totals[c.id]);
+    const smartData = channels.map(c => smart.totals[c.id]);
+
+    if (simChartInstance) {
+        simChartInstance.destroy();
+    }
+
+    simChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Legacy (Last Touch)',
+                    data: legacyData,
+                    backgroundColor: '#EF553B',
+                    borderRadius: 4
+                },
+                {
+                    label: 'Smart Model (Bias Corrected)',
+                    data: smartData,
+                    backgroundColor: '#636EFA',
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += '$' + (context.parsed.y / 1000).toFixed(0) + 'k';
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function (value) {
+                            return '$' + (value / 1000000).toFixed(1) + 'M';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
