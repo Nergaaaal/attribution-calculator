@@ -352,6 +352,7 @@ function runAdvancedSimulation() {
     const totalSimCount = parseInt(inputCount.value) || 8000;
     const applyStoriesLogic = checkStories.checked;
     const applyOfflineLogic = checkOffline.checked;
+    const applyStrictOne = document.getElementById('simStrictOne').checked;
 
     btn.innerHTML = 'Моделирование...';
     btn.disabled = true;
@@ -362,10 +363,17 @@ function runAdvancedSimulation() {
 
         // 2. Apply Filters
         let filteredJourneys = fullJourneys;
+
+        // A. Channel Filters (Combinations)
         if (selectedSimFilters.length > 0) {
             filteredJourneys = fullJourneys.filter(item => {
                 return selectedSimFilters.every(filterId => item.path.includes(filterId));
             });
+        }
+
+        // B. Strict Mode (Only Length 1)
+        if (applyStrictOne) {
+            filteredJourneys = filteredJourneys.filter(item => item.path.length === 1);
         }
 
         const filteredCount = filteredJourneys.length;
