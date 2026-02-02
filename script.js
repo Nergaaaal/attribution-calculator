@@ -93,13 +93,11 @@ function renderJourney() {
         totalScore += channel.score;
 
         const node = document.createElement('div');
-        node.className = 'journey-step';
+        node.className = 'journey-node';
         node.innerHTML = `
-            <div class="step-icon channel-${channel.color}">${channel.icon}</div>
-            <div class="step-info">
-                <div class="step-name">${channel.name}</div>
-                <div class="step-description">Score: ${channel.score}</div>
-            </div>
+            <div class="node-icon channel-${channel.color}">${channel.icon}</div>
+            <div class="node-name">${channel.name}</div>
+            <div class="node-score">${channel.score}</div>
             ${index < journey.length - 1 ? '<div class="arrow">→</div>' : ''}
             <button class="remove-node" onclick="removeFromJourney(${index})">×</button>
         `;
@@ -227,36 +225,23 @@ function renderResults(elementId, data, colorClass) {
     const sortedKeys = Object.keys(data).sort((a, b) => data[b] - data[a]);
 
     if (sortedKeys.length === 0) {
-        container.innerHTML = '<div class="empty-results"><p>Нет данных</p></div>';
+        container.innerHTML = '<div class="no-data">-</div>';
         return;
     }
 
-    sortedKeys.forEach((channelId, index) => {
+    sortedKeys.forEach(channelId => {
         const channel = channels.find(c => c.id === channelId);
         const value = data[channelId];
-
-        if (value > 0.01) { // Show even small values
+        if (value > 0.1) { // Hide negligible
             const row = document.createElement('div');
-            row.className = 'result-item'; // Fix: Match CSS class
-
-            // Determine bar color gradient
-            let gradientClass = 'result-bar-' + channel.color;
-            if (colorClass === 'blue') gradientClass = 'result-bar-digital'; // U-Shape default
-            if (colorClass === 'gray') gradientClass = 'result-bar-offline'; // Last Touch default styling fallback
-
-            // Specific overrides matching the requested "Green" design for Weighted
-            if (elementId === 'weightedResults') {
-                // Use channel specific colors for the bars? 
-                // Or green for all? The screenshot showed green bars for "Your Model".
-                // CSS has .result-bar-telemarketing etc. 
-                // Let's use channel specific colors as it looks premium.
-            }
-
+            row.className = 'result-row';
             row.innerHTML = `
-                <div class="result-rank">#${index + 1}</div>
-                <div class="result-channel-name">${channel.name}</div>
-                <div class="result-bar-container">
-                    <div class="result-bar ${gradientClass}" style="width: ${value}%">
+                <div class="channel-info">
+                    <span class="icon">${channel.icon}</span>
+                    <span>${channel.name}</span>
+                </div>
+                <div class="channel-bar-wrapper">
+                    <div class="result-bar fill-${colorClass}" style="width: ${value}%">
                         ${value.toFixed(1)}%
                     </div>
                 </div>
@@ -342,112 +327,54 @@ function runAdvancedSimulation() {
     const applyStoriesLogic = checkStories.checked;
     const applyOfflineLogic = checkOffline.checked;
 
-    // Get Filter Channels
-    const filterCheckboxes = document.querySelectorAll('.sim-channel-filters input:checked');
-    const filterChannels = Array.from(filterCheckboxes).map(cb => cb.value);
-
-    // Strict Match
-    const strictMatch = document.getElementById('simStrictMatch').checked;
-
-    // Filter Chips UI active state
-    document.querySelectorAll('.filter-chip').forEach(label => {
-        const input = label.querySelector('input');
-        if (input.checked) label.classList.add('active');
-        else label.classList.remove('active');
-    });
-
     // UI Feedback
     const originalText = btn.innerHTML;
     btn.innerHTML = 'Моделирование...';
     btn.disabled = true;
 
     setTimeout(() => {
-        // 1. Generate Realistic Data (Full Set)
-        const fullJourneys = generateRealisticJourneys(count);
+        // 1. Generate Realistic Data
+        const journeys = generateRealisticJourneys(count);
 
-        // 2. Filter Data (Intersection Logic or Strict)
-        let activeJourneys = fullJourneys;
-        if (filterChannels.length > 0) {
-            activeJourneys = fullJourneys.filter(row => {
-                const pathIds = row.path;
+        // 2. Calculate Models (Returns totals for each model)
+        const results = calculateThreeModels(journeys, applyStoriesLogic, applyOfflineLogic);
 
-                if (strictMatch) {
-                    // Strict: Path must contain ALL filter channels AND NO others
-                    // But order usually doesn't matter for "Exact Set", or does it? 
-                    // Let's assume Set Equality.
-                    if (pathIds.length !== filterChannels.length) return false;
-                    // Check if every item in path is in filter (and lengths equal implies set equality)
-                    return pathIds.every(id => filterChannels.includes(id));
-                } else {
-                    // Normal Intersection: Path must contain ALL filter channels
-                    return filterChannels.every(filterId => pathIds.includes(filterId));
-                }
-            });
-        }
+        // 3. Find Top Scenarios
+        const topPaths = analyzePathFrequencies(journeys);
 
-        const filteredCount = activeJourneys.length;
-
-        // 3. Calculate Models on Filtered Data
-        // If filtered is empty, handle gracefully
-        let results = { lastTouch: {}, uShape: {}, weighted: {} };
-        // Valid channels init
-        channels.forEach(c => {
-            results.lastTouch[c.id] = 0;
-            results.uShape[c.id] = 0;
-            results.weighted[c.id] = 0;
-        });
-
-        if (filteredCount > 0) {
-            results = calculateThreeModels(activeJourneys, applyStoriesLogic, applyOfflineLogic);
-        }
-
-        // 4. Find Top Scenarios (Filtered)
-        const topPaths = analyzePathFrequencies(activeJourneys);
-
-        // 5. Update UI Components
+        // 4. Update UI Components
         resultsDiv.classList.remove('hidden');
 
         // Cards
-        const totalSalesCard = document.getElementById('resTotalSales');
-        if (filterChannels.length > 0) {
-            totalSalesCard.innerHTML = `${filteredCount} <span style="font-size:14px; color:#94A3B8;">/ ${count}</span>`;
-            totalSalesCard.nextElementSibling.innerText = `В связке: ${filterChannels.map(id => getChannelName(id)).join(' + ')}`;
-        } else {
-            totalSalesCard.innerText = count;
-            totalSalesCard.nextElementSibling.innerText = '100% конверсия';
-        }
+        document.getElementById('resTotalSales').innerText = count;
 
         // Top Path
-        if (topPaths.length > 0) {
-            const bestPath = topPaths[0];
-            const bestPathStr = bestPath.path.map(id => getChannelName(id)).join(' → ');
-            const bestPathPercent = ((bestPath.count / filteredCount) * 100).toFixed(1) + '% от выборки';
-            document.getElementById('resTopPath').innerText = bestPathStr;
-            document.getElementById('resTopPathPercent').innerText = bestPathPercent;
-        } else {
-            document.getElementById('resTopPath').innerText = '-';
-            document.getElementById('resTopPathPercent').innerText = 'Нет данных';
-        }
+        const bestPath = topPaths[0];
+        const bestPathStr = bestPath.path.map(id => getChannelName(id)).join(' → ');
+        const bestPathPercent = ((bestPath.count / count) * 100).toFixed(1) + '% от всех продаж';
+        document.getElementById('resTopPath').innerText = bestPathStr;
+        document.getElementById('resTopPathPercent').innerText = bestPathPercent;
 
-        // Digital Diff (Logic update: If Digital is in filter, or just general stat)
+        // Digital Diff (Example: Digital Ads comparison between U-Shape and Weighted)
+        // Let's compare Digital Ads specifically as in screenshot
         const digitalId = 'digital';
-        const uShapeDigital = results.uShape[digitalId] || 0;
-        const weightedDigital = results.weighted[digitalId] || 0;
-
+        const uShapeDigital = results.uShape[digitalId];
+        const weightedDigital = results.weighted[digitalId];
+        // If U-Shape is much bigger than Weighted (as in screenshot +172.3%)
         let diffPercent = 0;
         if (weightedDigital > 0) {
             diffPercent = ((uShapeDigital - weightedDigital) / weightedDigital) * 100;
         }
         const diffSign = diffPercent > 0 ? '+' : '';
-        document.getElementById('resDigitalDiff').innerText = (weightedDigital === 0 && uShapeDigital === 0) ? '-' : `${diffSign}${diffPercent.toFixed(1)}%`;
+        document.getElementById('resDigitalDiff').innerText = `${diffSign}${diffPercent.toFixed(1)}%`;
 
-        // 6. Render Bars (Pass total active sales count for scaling)
-        renderComparisonBars(results, filteredCount || 1); // Avoid div by zero
+        // 5. Render Bars
+        renderComparisonBars(results);
 
-        // 7. Render Table
+        // 6. Render Table
         renderTopScenariosTable(topPaths);
 
-        // 8. Render Insights
+        // 7. Render Insights
         renderAdvancedInsights(results, applyStoriesLogic, applyOfflineLogic);
 
         // Reset Btn
@@ -621,44 +548,27 @@ function analyzePathFrequencies(dataset) {
     return sorted.slice(0, 5); // Top 5
 }
 
-function renderComparisonBars(results, totalScaleBase) {
+function renderComparisonBars(results) {
     const container = document.getElementById('simBarsContainer');
     container.innerHTML = '';
-
-    // If no explicit base provided, find max from results
-    let maxVal = 0;
-    if (!totalScaleBase) {
-        channels.forEach(ch => {
-            maxVal = Math.max(maxVal, results.lastTouch[ch.id], results.weighted[ch.id], results.uShape[ch.id]);
-        });
-        totalScaleBase = maxVal * 1.2; // 20% buffer
-    } else {
-        // If filtering, totalScaleBase might be 300 (filtered items).
-        // Check if any single bar exceeds this (unlikely but safe)
-        // Actually, for "distribution of contribution", totals sum to Total Scale.
-        // But individual bars can't exceed Total.
-        // We use totalScaleBase = FilteredCount * 0.6 for visual sizing like before
-        totalScaleBase = totalScaleBase * 0.6;
-    }
-
-    // Prevent div by zero
-    if (totalScaleBase === 0) totalScaleBase = 1;
 
     channels.forEach(channel => {
         const id = channel.id;
         // Get values
-        const valLast = Math.round(results.lastTouch[id] || 0);
-        const valWeighted = Math.round(results.weighted[id] || 0);
-        const valUShape = Math.round(results.uShape[id] || 0);
+        const valLast = Math.round(results.lastTouch[id]);
+        const valWeighted = Math.round(results.weighted[id]);
+        const valUShape = Math.round(results.uShape[id]);
 
-        // LOGIC FIX: If channel has 0 contribution in all models, HIDE it.
-        if (valLast === 0 && valWeighted === 0 && valUShape === 0) {
-            return; // Skip this channel
-        }
+        // Find max to calculate width % (relative to total sales or max value?)
+        // Let's use max value among all bars to scale correctly
+        // Or just fixed scale max = Total Sales (800)
+        // Better: Find global max across all channels/models to define 100% width
+        const totalSales = document.getElementById('resTotalSales').innerText;
+        const maxScale = parseInt(totalSales) * 0.6; // Scale so bars aren't too small
 
-        const wLast = Math.min((valLast / totalScaleBase) * 100, 100);
-        const wWeighted = Math.min((valWeighted / totalScaleBase) * 100, 100);
-        const wUShape = Math.min((valUShape / totalScaleBase) * 100, 100);
+        const wLast = Math.min((valLast / maxScale) * 100, 100);
+        const wWeighted = Math.min((valWeighted / maxScale) * 100, 100);
+        const wUShape = Math.min((valUShape / maxScale) * 100, 100);
 
         const html = `
             <div class="bar-group">

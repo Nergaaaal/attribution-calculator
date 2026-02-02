@@ -230,11 +230,6 @@ body {
     border-radius: 12px;
     padding: 16px;
     overflow-y: auto;
-    /* Added Flex behavior for direct children */
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-content: flex-start;
 }
 
 .empty-state {
@@ -247,7 +242,12 @@ body {
     padding: 20px;
 }
 
-/* .journey-steps removed - styles moved to .journey-path container */
+.journey-steps {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+}
 
 .journey-step {
     display: flex;
@@ -600,65 +600,6 @@ body {
     background: #cbd5e0;
 }
 
-/* Simulation Filters */
-.sim-filter-section {
-    margin-right: 20px;
-}
-
-.sim-filter-section label {
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: #64748B;
-    margin-bottom: 8px;
-}
-
-.sim-channel-filters {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    max-width: 300px;
-}
-
-.filter-chip {
-    font-size: 11px;
-    font-weight: 600;
-    color: white;
-    padding: 6px 10px;
-    border-radius: 12px;
-    cursor: pointer;
-    opacity: 0.5;
-    transition: all 0.2s;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    border: 2px solid transparent;
-}
-
-.filter-chip:hover {
-    opacity: 0.8;
-}
-
-.filter-chip input {
-    display: none;
-}
-
-/* Active State (Checked) */
-.filter-chip:has(input:checked) {
-    opacity: 1;
-    transform: scale(1.05);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    border-color: white;
-}
-
-/* Fallback for browsers not supporting :has */
-.filter-chip.active {
-    opacity: 1;
-    transform: scale(1.05);
-}
-
-
 /* Channel-Specific Filters */
 .channel-filter {
     margin-top: 8px;
@@ -847,11 +788,11 @@ body {
     font-size: 28px;
     font-weight: 800;
     color: #1E293B;
-    width: 120px;
-    padding-right: 20px;
-    /* Space for arrows */
+    width: 100px;
     outline: none;
     background: transparent;
+    margin-right: 10px;
+    /* Added spacing */
 }
 
 .sim-input-group .unit {
@@ -929,6 +870,50 @@ body {
 
 .sim-run-btn .arrow {
     font-size: 12px;
+}
+
+/* Channel Filters */
+.sim-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sim-filter-group label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748B;
+}
+
+.channel-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 300px;
+}
+
+.filter-chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid #E2E8F0;
+    background: #F8FAFC;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.filter-chip.selected {
+    background: #EFF6FF;
+    border-color: #3B82F6;
+    color: #2563EB;
+}
+
+.filter-chip:hover {
+    border-color: #CBD5E1;
 }
 
 /* 2. Summary Cards */
@@ -1183,6 +1168,68 @@ body {
     font-family: 'Courier New', monospace;
     font-size: 13px;
     color: #2563EB;
+}
+
+/* Attribution Results - Restored "Old" Design */
+.results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.result-item {
+    margin-bottom: 8px;
+}
+
+.result-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.result-channel-icon {
+    font-size: 20px;
+}
+
+.result-channel-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #2D3748;
+}
+
+.result-bar-container {
+    width: 100%;
+    height: 24px;
+    background-color: #EDF2F7;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+.result-bar {
+    height: 100%;
+    text-align: right;
+    padding-right: 10px;
+    line-height: 24px;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 12px;
+    transition: width 0.6s ease;
+    min-width: fit-content;
+}
+
+.result-bar-green {
+    background-color: #48BB78;
+}
+
+.result-bar-blue {
+    background-color: #4299E1;
+}
+
+.result-bar-gray {
+    background-color: #A0AEC0;
 }
 
 .hidden {
