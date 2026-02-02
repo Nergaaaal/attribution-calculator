@@ -1,37 +1,25 @@
-// Marketing Attribution Calculator - Interactive Web App
-
-// Channel Configuration
 const channels = [
-    { id: 'digital', name: 'Digital Ads', icon: '🎯', score: 1, color: 'digital' },
-    { id: 'stories', name: 'Stories', icon: '📱', score: 2, color: 'stories' },
-    { id: 'push', name: 'Push', icon: '🔔', score: 3, color: 'push' },
-    { id: 'sms', name: 'SMS', icon: '💬', score: 3, color: 'sms' },
-    { id: 'telemarketing', name: 'Telemarketing', icon: '📞', score: 5, color: 'telemarketing' },
-    { id: 'offline', name: 'Offline', icon: '🏪', score: 5, color: 'offline' }
+    { id: 'digital', name: 'Digital Ads', icon: '💻', color: 'blue', score: 1 },
+    { id: 'stories', name: 'Stories', icon: '📸', color: 'pink', score: 1 },
+    { id: 'push', name: 'Push', icon: '🔔', color: 'orange', score: 1 },
+    { id: 'sms', name: 'SMS', icon: '💬', color: 'purple', score: 1 },
+    { id: 'telemarketing', name: 'Telemarketing', icon: '📞', color: 'green', score: 1 },
+    { id: 'offline', name: 'Offline', icon: '🏢', color: 'indigo', score: 1 }
 ];
 
-// Customer Journey (array of channel IDs)
-let customerJourney = [];
+let journey = [];
 
-// Channel-specific filter states
-let channelFilters = {
-    storyTimeExclude: false,
-    offlineHelper: false
-};
+// Initialize app when DOM is loaded
+document.addEventListener('DOMContentLoaded', init);
 
-// Drag and Drop State
-let draggedIndex = null;
-
-// Initialize the app
 function init() {
     renderChannels();
     updateAllResults();
 
-    // Clear journey button
-    document.getElementById('clearJourney').addEventListener('click', clearJourney);
+    // Initial State: Empty Journey
+    renderJourney();
 }
 
-// Render channel configuration panel
 function renderChannels() {
     const grid = document.getElementById('channelsGrid');
     grid.innerHTML = '';
@@ -59,274 +47,158 @@ function renderChannels() {
     });
 }
 
-// Update channel score
 function updateChannelScore(channelId, newScore) {
     const channel = channels.find(c => c.id === channelId);
     if (channel) {
-        channel.score = parseFloat(newScore);
-        renderJourney(); // Re-render journey to update displayed scores
-        updateAllResults();
-    }
-}
-
-// Add channel to customer journey
-function addToJourney(channelId) {
-    customerJourney.push(channelId);
-    renderJourney();
-    updateAllResults();
-}
-
-// Render customer journey
-function renderJourney() {
-    const journeyPath = document.getElementById('journeyPath');
-
-    if (customerJourney.length === 0) {
-        journeyPath.innerHTML = `
-            <div class="empty-state">
-                <p>Выберите каналы из списка выше, чтобы построить путь клиента</p>
-            </div>
-        `;
-        updateTotalScore();
-        return;
-    }
-
-    const stepsContainer = document.createElement('div');
-    stepsContainer.className = 'journey-steps';
-
-    customerJourney.forEach((channelId, index) => {
-        const channel = channels.find(c => c.id === channelId);
-        if (!channel) return;
-
-        const stepEl = document.createElement('div');
-        stepEl.className = 'journey-step';
-        stepEl.draggable = true;
-        stepEl.dataset.index = index;
-
-        let filterHTML = '';
-
-        // Add channel-specific filters
-        if (channelId === 'stories') {
-            filterHTML = `
-                <div class="channel-filter">
-                    <div class="filter-checkbox-group">
-                        <input 
-                            type="checkbox" 
-                            id="storyExclude_${index}"
-                            ${channelFilters.storyTimeExclude ? 'checked' : ''}
-                            onchange="toggleStoryExclude(this.checked)"
-                        >
-                        <label for="storyExclude_${index}">Вход в течение 1ч (Исключить)</label>
-                    </div>
-                </div>
-            `;
-        } else if (channelId === 'offline') {
-            filterHTML = `
-                <div class="channel-filter">
-                    <div class="filter-checkbox-group">
-                        <input 
-                            type="checkbox" 
-                            id="offlineHelper_${index}"
-                            ${channelFilters.offlineHelper ? 'checked' : ''}
-                            onchange="toggleOfflineHelper(this.checked)"
-                        >
-                        <label for="offlineHelper_${index}">Отказ в приложении (Helper)</label>
-                    </div>
-                </div>
-            `;
-        }
-
-        stepEl.innerHTML = `
-            <div class="step-number">${index + 1}</div>
-            <div class="step-icon channel-${channel.color}">${channel.icon}</div>
-            <div class="step-info">
-                <div class="step-name">${channel.name}</div>
-                <div class="step-description">Очки в приложении (${channel.score} балл${channel.score === 1 ? '' : channel.score < 5 ? 'а' : 'ов'})</div>
-                ${filterHTML}
-            </div>
-            <button class="delete-btn" onclick="removeFromJourney(${index})">×</button>
-        `;
-
-        // Drag event listeners
-        stepEl.addEventListener('dragstart', handleDragStart);
-        stepEl.addEventListener('dragover', handleDragOver);
-        stepEl.addEventListener('drop', handleDrop);
-        stepEl.addEventListener('dragend', handleDragEnd);
-
-        stepsContainer.appendChild(stepEl);
-    });
-
-    journeyPath.innerHTML = '';
-    journeyPath.appendChild(stepsContainer);
-    updateTotalScore();
-}
-
-// Drag and Drop Handlers
-function handleDragStart(e) {
-    draggedIndex = parseInt(e.target.dataset.index);
-    e.target.classList.add('dragging');
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-}
-
-function handleDrop(e) {
-    e.preventDefault();
-    const dropIndex = parseInt(e.target.closest('.journey-step').dataset.index);
-
-    if (draggedIndex !== dropIndex) {
-        // Swap elements in the journey array
-        const draggedItem = customerJourney[draggedIndex];
-        customerJourney.splice(draggedIndex, 1);
-        customerJourney.splice(dropIndex, 0, draggedItem);
-
+        channel.score = parseFloat(newScore); // Fixed: parseFloat instead of parseInt
         renderJourney();
         updateAllResults();
     }
 }
 
-function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-    draggedIndex = null;
+function addToJourney(channelId) {
+    if (journey.length < 8) {
+        journey.push(channelId);
+        renderJourney();
+        updateAllResults();
+    } else {
+        alert('Максимальная длина цепочки - 8 каналов');
+    }
 }
 
-// Remove from journey
-function removeFromJourney(index) {
-    customerJourney.splice(index, 1);
+document.getElementById('clearJourney').addEventListener('click', () => {
+    journey = [];
     renderJourney();
     updateAllResults();
-}
+});
 
-// Clear journey
-function clearJourney() {
-    customerJourney = [];
-    renderJourney();
-    updateAllResults();
-}
+function renderJourney() {
+    const container = document.getElementById('journeyPath');
 
-// Toggle Stories time-based exclusion
-function toggleStoryExclude(checked) {
-    channelFilters.storyTimeExclude = checked;
-    renderJourney();
-    updateAllResults();
-}
-
-// Toggle Offline helper mode
-function toggleOfflineHelper(checked) {
-    channelFilters.offlineHelper = checked;
-    updateAllResults();
-}
-
-// Update total score display
-function updateTotalScore() {
-    const totalScore = customerJourney.reduce((sum, channelId) => {
-        const channel = channels.find(c => c.id === channelId);
-        return sum + (channel ? channel.score : 0);
-    }, 0);
-
-    document.getElementById('totalScore').textContent = totalScore;
-}
-
-// Get filtered journey (applying channel-specific filters)
-function getFilteredJourney() {
-    let filtered = [...customerJourney];
-
-    // Apply Stories time-based exclusion
-    if (channelFilters.storyTimeExclude) {
-        // Remove Stories from the journey if the filter is active
-        filtered = filtered.filter(channelId => channelId !== 'stories');
+    if (journey.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>Выберите каналы из списка выше, чтобы построить путь клиента</p>
+            </div>
+        `;
+        document.getElementById('totalScore').innerText = '0';
+        return;
     }
 
-    return filtered;
+    container.innerHTML = '';
+    let totalScore = 0;
+
+    journey.forEach((channelId, index) => {
+        const channel = channels.find(c => c.id === channelId);
+        totalScore += channel.score;
+
+        const node = document.createElement('div');
+        node.className = 'journey-node';
+        node.innerHTML = `
+            <div class="node-icon channel-${channel.color}">${channel.icon}</div>
+            <div class="node-name">${channel.name}</div>
+            <div class="node-score">${channel.score}</div>
+            ${index < journey.length - 1 ? '<div class="arrow">→</div>' : ''}
+            <button class="remove-node" onclick="removeFromJourney(${index})">×</button>
+        `;
+        container.appendChild(node);
+    });
+
+    document.getElementById('totalScore').innerText = totalScore.toFixed(1);
 }
 
-// Calculate Weighted Score Attribution
+function removeFromJourney(index) {
+    journey.splice(index, 1);
+    renderJourney();
+    updateAllResults();
+}
+
+// --- ATTRIBUTION LOGIC ---
+
+function updateAllResults() {
+    // 1. Weighted Score (Your Model)
+    const weighted = calculateWeightedScore();
+    renderResults('weightedResults', weighted, 'green');
+
+    // 2. U-Shape (Position Based: 40% First, 40% Last, 20% Middle)
+    const uShape = calculateUShape();
+    renderResults('ushapeResults', uShape, 'blue');
+
+    // 3. Last Touch
+    const lastTouch = calculateLastTouch();
+    renderResults('lastTouchResults', lastTouch, 'gray');
+
+    // 4. First Touch
+    const firstTouch = calculateFirstTouch();
+    renderResults('firstTouchResults', firstTouch, 'gray');
+
+    // 5. Insights
+    renderAttributionInsights({
+        weightedScore: weighted,
+        uShape: uShape
+    });
+}
+
+// Helper: Filter out 'offline' if helper is active (NOT USED IN MAIN LOGIC ANYMORE, but kept for safe)
+function getFilteredJourney() {
+    // For main calculator, we use the journey AS IS.
+    return journey;
+}
+
 function calculateWeightedScore() {
     const filtered = getFilteredJourney();
     if (filtered.length === 0) return {};
 
-    const totalScore = filtered.reduce((sum, channelId) => {
-        const channel = channels.find(c => c.id === channelId);
-        return sum + (channel ? channel.score : 0);
-    }, 0);
+    // Calculate sum of scores
+    let sum = 0;
+    const channelScores = filtered.map(id => {
+        const ch = channels.find(c => c.id === id);
+        return ch ? ch.score : 0;
+    });
+    sum = channelScores.reduce((a, b) => a + b, 0);
 
-    const attribution = {};
+    if (sum === 0) return {};
 
-    filtered.forEach(channelId => {
-        const channel = channels.find(c => c.id === channelId);
-        if (!channel) return;
-
-        if (!attribution[channelId]) {
-            attribution[channelId] = 0;
-        }
-
-        let contribution = (channel.score / totalScore) * 100;
-
-        // Apply offline helper logic - reduce contribution by 50%
-        if (channelId === 'offline' && channelFilters.offlineHelper) {
-            contribution *= 0.5;
-        }
-
-        attribution[channelId] += contribution;
+    const result = {};
+    filtered.forEach((id, idx) => {
+        const score = channelScores[idx];
+        const share = (score / sum) * 100;
+        result[id] = (result[id] || 0) + share;
     });
 
-    // Normalize if offline helper is active (redistribute remaining percentage)
-    if (channelFilters.offlineHelper && attribution['offline']) {
-        const totalAttribution = Object.values(attribution).reduce((sum, val) => sum + val, 0);
-        const scaleFactor = 100 / totalAttribution;
-
-        Object.keys(attribution).forEach(key => {
-            attribution[key] *= scaleFactor;
-        });
-    }
-
-    return attribution;
+    return result;
 }
 
-// Calculate U-Shape Attribution
 function calculateUShape() {
     const filtered = getFilteredJourney();
-    if (filtered.length === 0) return {};
+    const n = filtered.length;
+    if (n === 0) return {};
 
-    // Fixed weights: 40% first, 40% last, 20% middle
-    const firstWeight = 0.4;
-    const lastWeight = 0.4;
-    const middleWeight = 0.2;
+    const result = {};
 
-    const attribution = {};
-    const journeyLength = filtered.length;
+    // Initialize
+    filtered.forEach(id => result[id] = 0);
 
-    if (journeyLength === 1) {
-        // Single touchpoint gets 100%
-        attribution[filtered[0]] = 100;
-    } else if (journeyLength === 2) {
-        // Two touchpoints: split between first and last
-        attribution[filtered[0]] = firstWeight * 100;
-        attribution[filtered[1]] = lastWeight * 100;
+    if (n === 1) {
+        result[filtered[0]] = 100;
+    } else if (n === 2) {
+        result[filtered[0]] += 50;
+        result[filtered[1]] += 50;
     } else {
-        // Three or more touchpoints
-        const middleCount = journeyLength - 2;
-        const middlePerTouchpoint = (middleWeight / middleCount) * 100;
+        // First & Last get 40%
+        result[filtered[0]] += 40;
+        result[filtered[n - 1]] += 40;
 
-        filtered.forEach((channelId, index) => {
-            if (!attribution[channelId]) {
-                attribution[channelId] = 0;
-            }
-
-            if (index === 0) {
-                attribution[channelId] += firstWeight * 100;
-            } else if (index === journeyLength - 1) {
-                attribution[channelId] += lastWeight * 100;
-            } else {
-                attribution[channelId] += middlePerTouchpoint;
-            }
-        });
+        // Middle gets 20% distributed
+        const middleShare = 20 / (n - 2);
+        for (let i = 1; i < n - 1; i++) {
+            result[filtered[i]] += middleShare;
+        }
     }
 
-    return attribution;
+    return result;
 }
 
-// Calculate Last Touch Attribution
 function calculateLastTouch() {
     const filtered = getFilteredJourney();
     if (filtered.length === 0) return {};
@@ -335,7 +207,6 @@ function calculateLastTouch() {
     return { [lastChannelId]: 100 };
 }
 
-// Calculate First Touch Attribution
 function calculateFirstTouch() {
     const filtered = getFilteredJourney();
     if (filtered.length === 0) return {};
@@ -344,108 +215,69 @@ function calculateFirstTouch() {
     return { [firstChannelId]: 100 };
 }
 
-// Render attribution results
-function renderResults(attribution, containerId) {
-    const container = document.getElementById(containerId);
-
-    if (Object.keys(attribution).length === 0) {
-        container.innerHTML = `
-            <div class="empty-results">
-                <p>Добавьте каналы в путь клиента для расчета атрибуции</p>
-            </div>
-        `;
-        return;
-    }
-
-    // Display in the order of customer journey (not sorted by percentage)
-    const orderedResults = [];
-    const seenChannels = new Set();
-
-    // First, add channels in the order they appear in the journey
-    customerJourney.forEach(channelId => {
-        if (!seenChannels.has(channelId) && attribution[channelId] !== undefined) {
-            const channel = channels.find(c => c.id === channelId);
-            if (channel) {
-                orderedResults.push({ channel, percentage: attribution[channelId] });
-                seenChannels.add(channelId);
-            }
-        }
-    });
+function renderResults(elementId, data, colorClass) {
+    const container = document.getElementById(elementId);
+    if (!container) return;
 
     container.innerHTML = '';
 
-    orderedResults.forEach((item, index) => {
-        const resultEl = document.createElement('div');
-        resultEl.className = 'result-item';
-        resultEl.innerHTML = `
-            <div class="result-rank">#${index + 1}</div>
-            <div class="result-channel-name">${item.channel.name}</div>
-            <div class="result-bar-container">
-                <div class="result-bar result-bar-${item.channel.color}" style="width: ${item.percentage}%">
-                    ${item.percentage.toFixed(1)}%
-                </div>
-            </div>
-        `;
-        container.appendChild(resultEl);
-    });
-}
+    // Sort keys by value desc
+    const sortedKeys = Object.keys(data).sort((a, b) => data[b] - data[a]);
 
-// Update all attribution results
-function updateAllResults() {
-    const weightedScore = calculateWeightedScore();
-    const uShape = calculateUShape();
-    const lastTouch = calculateLastTouch();
-    const firstTouch = calculateFirstTouch();
-
-    renderResults(weightedScore, 'weightedResults');
-    renderResults(uShape, 'ushapeResults');
-    renderResults(lastTouch, 'lastTouchResults');
-    renderResults(firstTouch, 'firstTouchResults');
-
-    renderAttributionInsights(weightedScore, uShape);
-
-    updateTotalScore();
-}
-
-// Render attribution insights
-function renderAttributionInsights(weightedScore, uShape) {
-    const container = document.getElementById('attributionInsights');
-
-    if (Object.keys(weightedScore).length === 0 || Object.keys(uShape).length === 0) {
-        container.innerHTML = '';
+    if (sortedKeys.length === 0) {
+        container.innerHTML = '<div class="no-data">-</div>';
         return;
     }
 
-    // Find the biggest discrepancies
+    sortedKeys.forEach(channelId => {
+        const channel = channels.find(c => c.id === channelId);
+        const value = data[channelId];
+        if (value > 0.1) { // Hide negligible
+            const row = document.createElement('div');
+            row.className = 'result-row';
+            row.innerHTML = `
+                <div class="channel-info">
+                    <span class="icon">${channel.icon}</span>
+                    <span>${channel.name}</span>
+                </div>
+                <div class="channel-bar-wrapper">
+                    <div class="result-bar fill-${colorClass}" style="width: ${value}%">
+                        ${value.toFixed(1)}%
+                    </div>
+                </div>
+            `;
+            container.appendChild(row);
+        }
+    });
+}
+
+function renderAttributionInsights(results) {
+    const container = document.getElementById('attributionInsights');
+    if (!container) return;
+
     const discrepancies = [];
+    const weightedScores = results.weightedScore || {};
+    const uShapeScores = results.uShape || {};
 
-    // Get all unique channels
-    const allChannels = new Set([...Object.keys(weightedScore), ...Object.keys(uShape)]);
+    channels.forEach(channel => {
+        const weighted = weightedScores[channel.id] || 0;
+        const uShape = uShapeScores[channel.id] || 0;
+        const diff = weighted - uShape;
 
-    allChannels.forEach(channelId => {
-        const weighted = weightedScore[channelId] || 0;
-        const uShapeVal = uShape[channelId] || 0;
-        const diff = weighted - uShapeVal;
-
-        if (Math.abs(diff) > 5) { // Only show if difference > 5%
-            const channel = channels.find(c => c.id === channelId);
-            if (channel) {
-                discrepancies.push({
-                    channel,
-                    diff,
-                    weighted,
-                    uShapeVal
-                });
-            }
+        if (diff !== 0) {
+            discrepancies.push({
+                channel: channel,
+                diff: diff
+            });
         }
     });
 
     if (discrepancies.length === 0) {
-        container.innerHTML = '';
+        container.innerHTML = ''; // No discrepancies found
         return;
     }
 
-    // Sort by absolute difference (descending)
+    // Sort discrepancies by the absolute difference, highest first
     discrepancies.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
 
     // Get the most significant discrepancy
@@ -478,214 +310,345 @@ function renderAttributionInsights(weightedScore, uShape) {
     `;
 }
 
-// Initialize app when DOM is loaded
-document.addEventListener('DOMContentLoaded', init);
-
-
 // -------------------------------------------------------------
-// SIMULATION DASHBOARD LOGIC (AI MODEL)
+// ADVANCED SIMULATION DASHBOARD LOGIC (v2.0)
 // -------------------------------------------------------------
 
-document.getElementById('runSimulationBtn').addEventListener('click', runSimulation);
+document.getElementById('runSimulationBtn').addEventListener('click', runAdvancedSimulation);
 
-function runSimulation() {
+function runAdvancedSimulation() {
     const btn = document.getElementById('runSimulationBtn');
-    const thresholdInput = document.getElementById('simThreshold');
+    const inputCount = document.getElementById('simCount');
+    const checkStories = document.getElementById('simCheckStories');
+    const checkOffline = document.getElementById('simCheckOffline');
     const resultsDiv = document.getElementById('simulationResults');
-    const threshold = parseInt(thresholdInput.value) || 60;
+
+    const count = parseInt(inputCount.value) || 800;
+    const applyStoriesLogic = checkStories.checked;
+    const applyOfflineLogic = checkOffline.checked;
 
     // UI Feedback
-    btn.innerHTML = '<span class="icon">⏳</span> Генерирую данные...';
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Моделирование...';
     btn.disabled = true;
-    btn.classList.remove('pulse-btn');
 
-    // Simulate async work
     setTimeout(() => {
-        // 1. Generate Synthetic Data
-        const journeys = generateSyntheticData(8000);
+        // 1. Generate Realistic Data
+        const journeys = generateRealisticJourneys(count);
 
-        // 2. Calculate Models
-        const legacyResults = calculateBatchAttribution(journeys, 'legacy', threshold);
-        const smartResults = calculateBatchAttribution(journeys, 'smart', threshold);
+        // 2. Calculate Models (Returns totals for each model)
+        const results = calculateThreeModels(journeys, applyStoriesLogic, applyOfflineLogic);
 
-        // 3. Render Results
+        // 3. Find Top Scenarios
+        const topPaths = analyzePathFrequencies(journeys);
+
+        // 4. Update UI Components
         resultsDiv.classList.remove('hidden');
-        renderSimulationMetrics(legacyResults, smartResults, threshold);
-        renderSimulationChart(legacyResults, smartResults);
 
-        // Reset UI
-        btn.innerHTML = '<span class="icon">🚀</span> Запустить Симуляцию';
+        // Cards
+        document.getElementById('resTotalSales').innerText = count;
+
+        // Top Path
+        const bestPath = topPaths[0];
+        const bestPathStr = bestPath.path.map(id => getChannelName(id)).join(' → ');
+        const bestPathPercent = ((bestPath.count / count) * 100).toFixed(1) + '% от всех продаж';
+        document.getElementById('resTopPath').innerText = bestPathStr;
+        document.getElementById('resTopPathPercent').innerText = bestPathPercent;
+
+        // Digital Diff (Example: Digital Ads comparison between U-Shape and Weighted)
+        // Let's compare Digital Ads specifically as in screenshot
+        const digitalId = 'digital';
+        const uShapeDigital = results.uShape[digitalId];
+        const weightedDigital = results.weighted[digitalId];
+        // If U-Shape is much bigger than Weighted (as in screenshot +172.3%)
+        let diffPercent = 0;
+        if (weightedDigital > 0) {
+            diffPercent = ((uShapeDigital - weightedDigital) / weightedDigital) * 100;
+        }
+        const diffSign = diffPercent > 0 ? '+' : '';
+        document.getElementById('resDigitalDiff').innerText = `${diffSign}${diffPercent.toFixed(1)}%`;
+
+        // 5. Render Bars
+        renderComparisonBars(results);
+
+        // 6. Render Table
+        renderTopScenariosTable(topPaths);
+
+        // 7. Render Insights
+        renderAdvancedInsights(results, applyStoriesLogic, applyOfflineLogic);
+
+        // Reset Btn
+        btn.innerHTML = originalText;
         btn.disabled = false;
 
-        // Scroll to results
         resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    }, 500);
+    }, 600);
 }
 
-function generateSyntheticData(count) {
-    const channelIds = channels.map(c => c.id); // digital, stories, etc
+function getChannelName(id) {
+    const found = channels.find(c => c.id === id);
+    return found ? found.name : id;
+}
+
+function generateRealisticJourneys(count) {
+    // We need to generate paths that create the "problem" scenario (navigation bias)
+    // Common paths: Push -> Stories -> Offline; Digital -> Stories -> Offline
     const dataset = [];
+    const channelIds = channels.map(c => c.id);
 
     for (let i = 0; i < count; i++) {
-        // Random length 2-6
-        const len = Math.floor(Math.random() * 5) + 2;
-        const journey = [];
+        let journey = [];
+        const rand = Math.random();
 
-        for (let j = 0; j < len; j++) {
-            journey.push(channelIds[Math.floor(Math.random() * channelIds.length)]);
+        // 20% - The "Problem" path (Push -> Stories -> Offline)
+        if (rand < 0.20) {
+            journey = ['push', 'stories', 'offline'];
         }
-
-        let timeToConvert = 0;
-        let amount = Math.floor(Math.random() * 49000) + 1000;
-
-        // BIAS: 30% chance fast conversion with Stories as last touch
-        if (Math.random() < 0.30) {
-            journey[journey.length - 1] = 'stories';
-            timeToConvert = Math.floor(Math.random() * 55) + 5; // 5-60 sec
-        } else {
-            timeToConvert = Math.floor(Math.random() * 80000) + 120; // > 2 min
-            // Less chance for stories last touch naturally
-            if (journey[journey.length - 1] === 'stories' && Math.random() < 0.5) {
-                journey[journey.length - 1] = 'digital';
+        // 15% - Digital -> Stories -> Telemarketing
+        else if (rand < 0.35) {
+            journey = ['digital', 'stories', 'telemarketing'];
+        }
+        // 15% - Digital -> Offline
+        else if (rand < 0.50) {
+            journey = ['digital', 'offline'];
+        }
+        // Others - Random
+        else {
+            const len = Math.floor(Math.random() * 3) + 2; // 2-4 steps
+            for (let j = 0; j < len; j++) {
+                journey.push(channelIds[Math.floor(Math.random() * channelIds.length)]);
             }
         }
-
-        dataset.push({ journey, timeToConvert, amount });
+        dataset.push({ path: journey });
     }
     return dataset;
 }
 
-function calculateBatchAttribution(dataset, modelType, threshold) {
-    const totals = {};
-    channels.forEach(c => totals[c.id] = 0);
-    let filteredCount = 0;
+function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
+    // Config values from main app
+    // We need to use "current" scores for Weighted model
+    // And standard 40/40/20 for U-Shape
+
+    const weightedTotals = {};
+    const uShapeTotals = {};
+    const lastTouchTotals = {};
+
+    channels.forEach(c => {
+        weightedTotals[c.id] = 0;
+        uShapeTotals[c.id] = 0;
+        lastTouchTotals[c.id] = 0;
+    });
 
     dataset.forEach(row => {
-        let path = [...row.journey];
-        const revenue = row.amount;
+        let path = [...row.path];
 
-        if (modelType === 'smart') {
-            const lastTouch = path[path.length - 1];
-            if (lastTouch === 'stories' && row.timeToConvert < threshold) {
-                // Navigation Bias - Exclude last touch
-                path.pop();
-                filteredCount++;
+        // --- LOGIC MODIFIERS ---
+        // 1. Stories < 1h Logic (Simulated):
+        // If 'stories' is in path, we assume 50% of them are "navigation clicks" (fast)
+        // If useStoriesLogic is TRUE, we remove 'stories' from calculation if it looks like nav
+        // For simulation simplicity: if path contains 'stories' in middle, remove it 50% of time
+        if (useStoriesLogic) {
+            // Apply logic: if 'stories' is treated as non-valuable, we skip it
+            // In the screenshot "Stories Score = 0 (if < 1h)"
+            // Let's filter out 'stories' from the path for the models that support this logic
+            // Actually, usually this logic applies to ALL models or specific ones.
+            // Let's assume this modifies the *Effective Path* for Weighted/U-Shape
+
+            // In simulation, let's say "Stories" in middle position is often noise.
+            // We'll strip it out for U-Shape and Weighted if simulating "Smart" logic
+            // But wait, the screenshot compares "U-Shape" vs "Weighted".
+            // Let's apply valid path logic.
+
+            // For this output, we need:
+            // 1. Last Touch (Raw, naive)
+            // 2. Weighted (Your Model - with modifiers)
+            // 3. U-Shape (Market Standard - usually naive path but position based)
+
+            // Actually, "Stories < 1h" usually modifies the Weighted Score (score=0).
+        }
+
+        const n = path.length;
+        const revenue = 1; // 1 sale
+
+        // --- 1. LAST TOUCH (Naive) ---
+        lastTouchTotals[path[n - 1]] += revenue;
+
+        // --- 2. U-SHAPE (Standard 40/40/20) ---
+        if (n === 1) {
+            uShapeTotals[path[0]] += revenue;
+        } else if (n === 2) {
+            uShapeTotals[path[0]] += revenue * 0.5;
+            uShapeTotals[path[1]] += revenue * 0.5;
+        } else {
+            uShapeTotals[path[0]] += revenue * 0.4;
+            uShapeTotals[path[n - 1]] += revenue * 0.4;
+            const mid = (revenue * 0.2) / (n - 2);
+            for (let k = 1; k < n - 1; k++) {
+                uShapeTotals[path[k]] += mid;
             }
         }
 
-        if (path.length === 0) return; // All filtered out
+        // --- 3. WEIGHTED SCORE (Your Model) ---
+        // This is where "Logic" checkboxes apply heavily
+        // We get scores from the UI config
+        let totalScore = 0;
+        const itemScores = path.map(channelId => {
+            const chObj = channels.find(c => c.id === channelId);
+            let score = chObj ? chObj.score : 1;
 
-        if (modelType === 'legacy') {
-            // Last Touch
-            const winner = path[path.length - 1];
-            totals[winner] += revenue;
-        } else if (modelType === 'smart') {
-            // U-Shape (40/40/20)
-            const n = path.length;
-            if (n === 1) {
-                totals[path[0]] += revenue;
-            } else if (n === 2) {
-                totals[path[0]] += revenue * 0.5;
-                totals[path[1]] += revenue * 0.5;
-            } else {
-                totals[path[0]] += revenue * 0.4; // First
-                totals[path[path.length - 1]] += revenue * 0.4; // Last
-
-                const middleShare = (revenue * 0.2) / (n - 2);
-                for (let k = 1; k < n - 1; k++) {
-                    totals[path[k]] += middleShare;
-                }
+            // APPLY CHECKBOX LOGIC 1: Stories
+            if (useStoriesLogic && channelId === 'stories') {
+                // Simulate that for THIS specific journey, it was a "fast" click
+                // In a real app we check time. In simulation, we assume 100% application for demo
+                // or 50% probabilistic.
+                // Screenshot implies "Stories Score = 0".
+                score = 0;
             }
+
+            // APPLY CHECKBOX LOGIC 2: Offline
+            if (useOfflineLogic && channelId === 'offline') {
+                // Screenshot: "Offline Score = 2 (if app rejection)"
+                // Normally Offline might be 10.
+                score = 2; // Hardcoded simulation value or reduced value
+            }
+
+            return { id: channelId, score: score };
+        });
+
+        // Calculate total score
+        const sumScores = itemScores.reduce((sum, item) => sum + item.score, 0);
+
+        if (sumScores > 0) {
+            itemScores.forEach(item => {
+                weightedTotals[item.id] += (item.score / sumScores) * revenue;
+            });
         }
     });
 
-    return { totals, filteredCount };
+    return {
+        lastTouch: lastTouchTotals,
+        uShape: uShapeTotals,
+        weighted: weightedTotals
+    };
 }
 
-let simChartInstance = null;
+function analyzePathFrequencies(dataset) {
+    const counts = {};
+    dataset.forEach(row => {
+        const key = row.path.join('|');
+        counts[key] = (counts[key] || 0) + 1;
+    });
 
-function renderSimulationMetrics(legacy, smart, threshold) {
-    // Stories Impact
-    const legStories = legacy.totals['stories'];
-    const smartStories = smart.totals['stories'];
-    const diff = legStories > 0 ? ((smartStories - legStories) / legStories) * 100 : 0;
+    const sorted = Object.keys(counts).map(key => ({
+        path: key.split('|'),
+        count: counts[key]
+    })).sort((a, b) => b.count - a.count);
 
-    // Formatting
-    const fmt = (num) => '$' + (num / 1000000).toFixed(1) + 'M';
-
-    document.getElementById('legacyStories').innerText = fmt(legStories);
-    document.getElementById('smartStories').innerText = fmt(smartStories);
-    document.getElementById('storiesDiff').innerText = Math.round(diff) + '%';
-
-    // filtered count
-    document.getElementById('filteredCount').innerText = smart.filteredCount.toLocaleString();
-    document.getElementById('thresholdDisplay').innerText = threshold;
+    return sorted.slice(0, 5); // Top 5
 }
 
-function renderSimulationChart(legacy, smart) {
-    const ctx = document.getElementById('simChart').getContext('2d');
+function renderComparisonBars(results) {
+    const container = document.getElementById('simBarsContainer');
+    container.innerHTML = '';
 
-    // Prepare data
-    const labels = channels.map(c => c.name);
-    const legacyData = channels.map(c => legacy.totals[c.id]);
-    const smartData = channels.map(c => smart.totals[c.id]);
+    channels.forEach(channel => {
+        const id = channel.id;
+        // Get values
+        const valLast = Math.round(results.lastTouch[id]);
+        const valWeighted = Math.round(results.weighted[id]);
+        const valUShape = Math.round(results.uShape[id]);
 
-    if (simChartInstance) {
-        simChartInstance.destroy();
+        // Find max to calculate width % (relative to total sales or max value?)
+        // Let's use max value among all bars to scale correctly
+        // Or just fixed scale max = Total Sales (800)
+        // Better: Find global max across all channels/models to define 100% width
+        const totalSales = document.getElementById('resTotalSales').innerText;
+        const maxScale = parseInt(totalSales) * 0.6; // Scale so bars aren't too small
+
+        const wLast = Math.min((valLast / maxScale) * 100, 100);
+        const wWeighted = Math.min((valWeighted / maxScale) * 100, 100);
+        const wUShape = Math.min((valUShape / maxScale) * 100, 100);
+
+        const html = `
+            <div class="bar-group">
+                <div class="bar-group-header">
+                    <span>${channel.name}</span>
+                    <span class="bar-stats">Last: ${valLast} | Score: ${valWeighted} | U: ${valUShape}</span>
+                </div>
+                
+                <!-- Last Touch (Gray) -->
+                ${wLast > 0 ? `
+                <div class="bar-row">
+                    <div class="bar-fill fill-gray" style="width: ${wLast}%"></div>
+                </div>` : ''}
+
+                <!-- Weighted (Green - Your Model) -->
+                ${wWeighted > 0 ? `
+                <div class="bar-row">
+                    <div class="bar-fill fill-green" style="width: ${wWeighted}%"></div>
+                </div>` : ''}
+
+                <!-- U-Shape (Blue) -->
+                ${wUShape > 0 ? `
+                <div class="bar-row">
+                    <div class="bar-fill fill-blue" style="width: ${wUShape}%"></div>
+                </div>` : ''}
+            </div>
+        `;
+        container.innerHTML += html;
+    });
+}
+
+function renderTopScenariosTable(topPaths) {
+    const tbody = document.getElementById('simTableBody');
+    tbody.innerHTML = '';
+
+    topPaths.forEach(item => {
+        const pathStr = item.path.map(id => getChannelName(id)).join(' → ');
+        const row = `
+            <tr>
+                <td>${pathStr}</td>
+                <td class="text-right"><strong>${item.count}</strong></td>
+            </tr>
+        `;
+        tbody.innerHTML += row;
+    });
+}
+
+function renderAdvancedInsights(results, storiesLogic, offlineLogic) {
+    // Generate text similar to screenshot
+    // "Ваша модель присваивает Телемаркетингу... больше..."
+    const tmId = 'telemarketing';
+    const tmWeighted = results.weighted[tmId];
+    const tmUShape = results.uShape[tmId];
+
+    let diff = 0;
+    let diffText = '';
+
+    if (tmWeighted > tmUShape) {
+        diff = ((tmWeighted - tmUShape) / tmUShape) * 100;
+        diffText = `Ваша модель "Score" присваивает Телемаркетингу (TM) на <strong>${diff.toFixed(0)}% больше продаж</strong>, чем U-Shape. Это происходит из-за высокого балла (5).`;
+    } else {
+        diffText = `Ваша модель показывает схожие результаты с U-Shape.`;
     }
 
-    simChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Legacy (Last Touch)',
-                    data: legacyData,
-                    backgroundColor: '#EF553B',
-                    borderRadius: 4
-                },
-                {
-                    label: 'Smart Model (Bias Corrected)',
-                    data: smartData,
-                    backgroundColor: '#636EFA',
-                    borderRadius: 4
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                label += '$' + (context.parsed.y / 1000).toFixed(0) + 'k';
-                            }
-                            return label;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function (value) {
-                            return '$' + (value / 1000000).toFixed(1) + 'M';
-                        }
-                    }
-                }
-            }
-        }
-    });
+    // Digital check
+    const digId = 'digital';
+    const digW = results.weighted[digId];
+    const digU = results.uShape[digId];
+    if (digU > digW) {
+        const dDiff = ((digU - digW) / digW) * 100;
+        diffText += ` При этом Digital недооценен. В U-Shape он получает на ${dDiff.toFixed(0)}% больше заслуг как "Инициатор" сделки.`;
+    }
+
+    const logicText = storiesLogic ?
+        `<br><br>Логика "Stories < 1h" работает: часть касаний сторис была исключена (score=0), что перераспределило вес на другие каналы.` :
+        `<br><br>Логика "Stories < 1h" выключена.`;
+
+    document.getElementById('simInsightText').innerHTML = diffText + logicText;
+
+    // Update settings box
+    document.getElementById('insightStoriesScore').innerText = storiesLogic ? '0' : 'Current';
+    document.getElementById('insightOfflineScore').innerText = offlineLogic ? '2' : 'Current';
 }

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Marketing Attribution Calculator</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=1.2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -124,45 +124,104 @@
 
     <!-- Simulation Dashboard Section -->
     <div class="simulation-section">
-        <div class="simulation-header">
-            <h2>🤖 Симуляция Данных (AI Model)</h2>
-            <p>Сгенерируйте 8,000 виртуальных цепочек чтобы проверить гипотезу "Navigation Bias"</p>
-        </div>
 
-        <div class="simulation-controls">
-            <button id="runSimulationBtn" class="primary-btn pulse-btn">
-                <span class="icon">🚀</span> Запустить Симуляцию
+        <!-- 1. Controls Panel -->
+        <div class="sim-controls-panel">
+            <div class="sim-input-group">
+                <label>КОЛИЧЕСТВО ПРОДАЖ (КРЕДИТОВ)</label>
+                <div class="input-wrapper">
+                    <input type="number" id="simCount" value="800" min="100" max="10000" step="100">
+                    <span class="unit">шт.</span>
+                </div>
+            </div>
+
+            <div class="sim-checkboxes">
+                <label class="checkbox-container">
+                    <input type="checkbox" id="simCheckStories" checked>
+                    <span class="checkmark"></span>
+                    Применять логику "Stories < 1h" </label>
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="simCheckOffline" checked>
+                            <span class="checkmark"></span>
+                            Применять логику "Отказ в App"
+                        </label>
+            </div>
+
+            <button id="runSimulationBtn" class="sim-run-btn">
+                Смоделировать <span class="arrow">▶</span>
             </button>
-            <div class="sim-settings">
-                <label>
-                    <span class="icon">⏱️</span> Порог времени (Stories):
-                    <input type="number" id="simThreshold" value="60" min="0" max="300" step="10"> сек
-                </label>
-            </div>
         </div>
 
-        <div id="simulationResults" class="simulation-results hidden">
-            <div class="metrics-grid">
-                <div class="metric-card negative">
-                    <h3>Stories (Legacy)</h3>
-                    <div class="metric-value" id="legacyStories">0</div>
-                    <div class="metric-label">Last Touch Model</div>
+        <!-- Simulation Results Container (Hidden by default) -->
+        <div id="simulationResults" class="hidden">
+
+            <!-- 2. Summary Cards -->
+            <div class="sim-cards-grid">
+                <div class="sim-card">
+                    <div class="card-label">ВСЕГО ПРОДАЖ</div>
+                    <div class="card-value" id="resTotalSales">800</div>
+                    <div class="card-sub text-green">100% конверсия</div>
                 </div>
-                <div class="metric-arrow">⬇️ <span id="storiesDiff">0%</span></div>
-                <div class="metric-card positive">
-                    <h3>Stories (Smart)</h3>
-                    <div class="metric-value" id="smartStories">0</div>
-                    <div class="metric-label">Smart Model</div>
+                <div class="sim-card">
+                    <div class="card-label">САМЫЙ ЧАСТЫЙ ПУТЬ</div>
+                    <div class="card-value sm" id="resTopPath">Push → Stories → Offline</div>
+                    <div class="card-sub text-gray" id="resTopPathPercent">18.3% от всех продаж</div>
+                </div>
+                <div class="sim-card">
+                    <div class="card-label">РАЗНИЦА МОДЕЛЕЙ (DIGITAL)</div>
+                    <div class="card-value" id="resDigitalDiff">+172.3%</div>
+                    <div class="card-sub text-gray">U-Shape vs Weighted</div>
                 </div>
             </div>
 
-            <div class="chart-container">
-                <canvas id="simChart"></canvas>
+            <!-- 3. Distribution Bars (HTML implementation for pixel-perfect match) -->
+            <div class="sim-chart-section">
+                <div class="section-title">
+                    <span class="icon-bar">📊</span> Распределение вклада (Атрибуция продаж)
+                </div>
+
+                <div id="simBarsContainer" class="sim-bars-container">
+                    <!-- Dynamic Bars Generated via JS -->
+                </div>
+
+                <div class="sim-legend">
+                    <div class="legend-item"><span class="dot l-gray"></span> Last Touch</div>
+                    <div class="legend-item"><span class="dot l-green"></span> Ваша модель (Баллы)</div>
+                    <div class="legend-item"><span class="dot l-blue"></span> U-Shape (Market Standard)</div>
+                </div>
             </div>
 
-            <div class="insight-box">
-                <p>📉 <strong>Инсайт:</strong> Умная модель отсеяла <span id="filteredCount" class="highlight">0</span>
-                    конверсий, где Stories были просто навигацией (менее <span id="thresholdDisplay">60</span> сек).</p>
+            <!-- 4. Top Scenarios Table -->
+            <div class="sim-table-section">
+                <div class="section-title">ТОП СЦЕНАРИЕВ ПОВЕДЕНИЯ</div>
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Путь</th>
+                            <th class="text-right">Кол-во</th>
+                        </tr>
+                    </thead>
+                    <tbody id="simTableBody">
+                        <!-- Dynamic Rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 5. Analytical Insight -->
+            <div class="sim-insight-section">
+                <div class="insight-icon">💡</div>
+                <div class="insight-content">
+                    <h3>Аналитический вывод</h3>
+                    <p id="simInsightText">
+                        Ваша модель присваивает Телемаркетингу на 52% больше продаж...
+                    </p>
+                    <div class="insight-code">
+                        Настройки:<br>
+                        Stories Score = <span id="insightStoriesScore">0</span> (если < 1h)<br>
+                            Offline Score = <span id="insightOfflineScore">0.5</span> (если отказ в App) - Weighted
+                            Reduced
+                    </div>
+                </div>
             </div>
         </div>
     </div>
