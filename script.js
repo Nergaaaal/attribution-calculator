@@ -557,6 +557,9 @@ function renderTopScenariosTable(topPaths, totalCount) {
     const tbody = document.getElementById('simTableBody');
     tbody.innerHTML = '';
 
+    // Safety check to prevent NaN
+    totalCount = totalCount || 1;
+
     if (topPaths.length === 0) {
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Нет данных</td></tr>';
         return;
@@ -564,13 +567,18 @@ function renderTopScenariosTable(topPaths, totalCount) {
 
     topPaths.forEach(item => {
         const pathStr = item.path.map(id => channels.find(c => c.id === id).name).join(' → ');
-        const percent = ((item.count / totalCount) * 100).toFixed(1);
 
+        let percentVal = 0;
+        if (totalCount > 0) {
+            percentVal = ((item.count / totalCount) * 100).toFixed(1);
+        }
+
+        // Inline styles to guarantee alignment even if CSS cache fails
         const row = `
             <tr>
                 <td>${pathStr}</td>
-                <td class="col-number"><strong>${item.count}</strong></td>
-                <td class="col-number" style="color:#64748B">${percent}%</td>
+                <td class="col-number" style="width: 110px; text-align: right;"><strong>${item.count}</strong></td>
+                <td class="col-number" style="width: 110px; text-align: right; color:#64748B">${percentVal}%</td>
             </tr>
         `;
         tbody.innerHTML += row;
