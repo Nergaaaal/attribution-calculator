@@ -455,51 +455,62 @@ function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
 
     dataset.forEach(row => {
         let path = [...row.path];
-        const n = path.length;
-        const revenue = 1;
 
-        // Last Touch
-        lastTouchTotals[path[n - 1]] += revenue;
-
-        // U-Shape
-        // FIX: If Stories logic is active, it shouldn't be counted in position-based logic (acting as if it didn't exist)
-        let uShapePath = [...path];
-        if (useStoriesLogic) {
-            uShapePath = uShapePath.filter(id => id !== 'stories');
-        }
-
-        const un = uShapePath.length;
-
-        if (un === 1) {
-            uShapeTotals[uShapePath[0]] += revenue;
-        } else if (un === 2) {
-            uShapeTotals[uShapePath[0]] += revenue * 0.5;
-            uShapeTotals[uShapePath[1]] += revenue * 0.5;
-        } else if (un > 2) {
-            uShapeTotals[uShapePath[0]] += revenue * 0.4;
-            uShapeTotals[uShapePath[un - 1]] += revenue * 0.4;
-            const mid = (revenue * 0.2) / (un - 2);
-            for (let k = 1; k < un - 1; k++) {
-                uShapeTotals[uShapePath[k]] += mid;
-            }
-        }
-
-        // Weighted
+        // --- 1. Weighted (Original Logic: just zero out score) ---
         let totalScore = 0;
         const itemScores = path.map(channelId => {
             const chObj = channels.find(c => c.id === channelId);
             let score = chObj ? chObj.score : 1;
             if (useStoriesLogic && channelId === 'stories') score = 0;
-            if (useOfflineLogic && channelId === 'offline') score = 2;
+            if (useOfflineLogic && channelId === 'offline') score = 2; // Penalty
             return { id: channelId, score: score };
         });
 
         const sumScores = itemScores.reduce((sum, item) => sum + item.score, 0);
-
         if (sumScores > 0) {
             itemScores.forEach(item => {
-                weightedTotals[item.id] += (item.score / sumScores) * revenue;
+                weightedTotals[item.id] += (item.score / sumScores);
             });
+        }
+
+        // --- 2. U-Shape & Last Touch (Filtered Path Logic) ---
+        // If Logic is ON, completely remove Stories/Offline from the path consideration for U-Shape/LT?
+        // User Request: "Story doesn't disappear in U-Shape".
+        // Interpretation: If Stories logic is ON, treat it as if it didn't exist in the chain for position-based models.
+
+        let filteredPath = path.filter(id => {
+            if (useStoriesLogic && id === 'stories') return false;
+            // NOTE: Offline is usually a "Endpoint" or valid touch, just low score.
+            // But if user wants "Logic Applied" -> maybe exclude? 
+            // The prompt said "Stories < 1h logic ignored in U-Shape".
+            // Let's exclude Stories. Only exclude Offline if it's considered "Bounce" (logic says 'Refusal').
+            // If refusal, it contributes nothing? Or just low score?
+            // "Refusal in App" -> likely shouldn't get attribution if it's a refusal. 
+            // Let's exclude it from path for U-Shape too if logic checked.
+            if (useOfflineLogic && id === 'offline') return false;
+            return true;
+        });
+
+        if (filteredPath.length > 0) {
+            const n = filteredPath.length;
+
+            // Last Touch (on filtered)
+            lastTouchTotals[filteredPath[n - 1]] += 1;
+
+            // U-Shape (on filtered)
+            if (n === 1) {
+                uShapeTotals[filteredPath[0]] += 1;
+            } else if (n === 2) {
+                uShapeTotals[filteredPath[0]] += 0.5;
+                uShapeTotals[filteredPath[1]] += 0.5;
+            } else {
+                uShapeTotals[filteredPath[0]] += 0.4;
+                uShapeTotals[filteredPath[n - 1]] += 0.4;
+                const mid = 0.2 / (n - 2);
+                for (let k = 1; k < n - 1; k++) {
+                    uShapeTotals[filteredPath[k]] += mid;
+                }
+            }
         }
     });
 
