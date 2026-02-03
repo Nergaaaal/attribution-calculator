@@ -236,9 +236,9 @@ function renderResults(attribution, containerId) {
 
     if (Object.keys(attribution).length === 0) {
         container.innerHTML = `
-            <div class="empty-results-placeholder">
-                <div class="empty-results-icon">⚡️</div>
-                <div>Добавьте каналы в "Путь клиента", чтобы увидеть расчет</div>
+            <div class="sim-empty-state">
+                <div class="empty-icon">✨</div>
+                <div class="empty-text">Добавьте каналы в "Путь клиента", чтобы увидеть результат</div>
             </div>
         `;
         return;
@@ -330,16 +330,9 @@ function runAdvancedSimulation() {
     const checkOffline = document.getElementById('simCheckOffline');
     const resultsDiv = document.getElementById('simulationResults');
 
-    if (!inputCount) {
-        console.error("Input 'simCount' not found");
-        return;
-    }
-
-    const val = parseInt(inputCount.value);
-    const totalSimCount = (isNaN(val) || val <= 0) ? 8000 : val;
-
-    const applyStoriesLogic = checkStories ? checkStories.checked : false;
-    const applyOfflineLogic = checkOffline ? checkOffline.checked : false;
+    const totalSimCount = parseInt(inputCount.value) || 8000;
+    const applyStoriesLogic = checkStories.checked;
+    const applyOfflineLogic = checkOffline.checked;
 
     btn.innerHTML = 'Моделирование...';
     btn.disabled = true;
