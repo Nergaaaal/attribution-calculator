@@ -242,6 +242,7 @@ body {
     padding: 20px;
 }
 
+/* JOURNEY STEPS - V1.5 FIXED (Column Layout) */
 .journey-steps {
     display: flex;
     flex-direction: column;
@@ -304,16 +305,6 @@ body {
         opacity: 1;
         transform: translateX(0);
     }
-}
-
-.journey-step:hover {
-    border-color: var(--accent-blue);
-    box-shadow: var(--shadow-md);
-}
-
-.journey-step.dragging {
-    opacity: 0.5;
-    transform: scale(0.95);
 }
 
 .step-number {
@@ -497,21 +488,19 @@ body {
     box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
 }
 
-/* Results List */
+/* Results List - V1.5 FIXED (Row Design) */
 .results-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
 }
 
 .result-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px;
-    background: white;
-    border-radius: 10px;
-    animation: fadeIn 0.4s ease-out;
+    margin-bottom: 0;
+    width: 100%;
 }
 
 @keyframes fadeIn {
@@ -527,72 +516,91 @@ body {
 }
 
 .result-rank {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    color: var(--text-secondary);
-    min-width: 28px;
+    color: #A0AEC0;
+    width: 25px;
+    flex-shrink: 0;
+}
+
+.result-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 120px;
+    /* Fixed width for name */
+    flex-shrink: 0;
+}
+
+.result-channel-icon {
+    display: none;
 }
 
 .result-channel-name {
     font-size: 14px;
     font-weight: 600;
-    color: var(--text-primary);
-    min-width: 120px;
+    color: #2D3748;
 }
 
 .result-bar-container {
     flex: 1;
-    height: 28px;
-    background: var(--primary-bg);
+    /* Take remaining space */
+    height: 32px;
+    /* Taller bars */
+    background-color: #F7FAFC;
     border-radius: 6px;
     overflow: hidden;
     position: relative;
+    display: flex;
+    align-items: center;
 }
 
 .result-bar {
     height: 100%;
+    text-align: right;
+    padding-right: 12px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    padding-right: 10px;
-    border-radius: 6px;
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    color: white;
     font-size: 13px;
     font-weight: 700;
-    color: white;
-    min-width: 70px;
-    /* Ensure small percentages don't overflow */
-    white-space: nowrap;
+    border-radius: 6px;
+    transition: width 0.6s ease;
+    min-width: 40px;
 }
 
-.result-bar-digital {
-    background: linear-gradient(90deg, #4299e1, #3182ce);
+/* Channel Colors for Bars */
+.bg-digital {
+    background-color: #4299e1;
 }
 
-.result-bar-stories {
-    background: linear-gradient(90deg, #ed64a6, #d53f8c);
+.bg-stories {
+    background-color: #ed64a6;
 }
 
-.result-bar-push {
-    background: linear-gradient(90deg, #ed8936, #dd6b20);
+.bg-push {
+    background-color: #ed8936;
 }
 
-.result-bar-sms {
-    background: linear-gradient(90deg, #9f7aea, #805ad5);
+.bg-sms {
+    background-color: #9f7aea;
 }
 
-.result-bar-telemarketing {
-    background: linear-gradient(90deg, #48bb78, #38a169);
+.bg-telemarketing {
+    background-color: #48bb78;
 }
 
-.result-bar-offline {
-    background: linear-gradient(90deg, #667eea, #5a67d8);
+.bg-offline {
+    background-color: #667eea;
 }
 
-.empty-results {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-secondary);
+.bg-gray {
+    background-color: #CBD5E0;
+}
+
+.hidden {
+    display: none;
 }
 
 /* Responsive Design */
@@ -632,7 +640,7 @@ body {
     background: #cbd5e0;
 }
 
-/* Channel-Specific Filters */
+/* Channel-Specific Filters (Legacy) */
 .channel-filter {
     margin-top: 8px;
     padding: 10px;
@@ -646,64 +654,12 @@ body {
     from {
         opacity: 0;
         max-height: 0;
-        padding-top: 0;
-        padding-bottom: 0;
     }
 
     to {
         opacity: 1;
         max-height: 100px;
-        padding-top: 10px;
-        padding-bottom: 10px;
     }
-}
-
-.filter-checkbox-group {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.filter-checkbox-group input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    accent-color: var(--accent-purple);
-}
-
-.filter-checkbox-group label {
-    font-size: 13px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    user-select: none;
-}
-
-.filter-time-input {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 6px;
-    margin-left: 26px;
-}
-
-.filter-time-input input {
-    width: 60px;
-    padding: 4px 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    font-size: 13px;
-    outline: none;
-    transition: var(--transition);
-}
-
-.filter-time-input input:focus {
-    border-color: var(--accent-blue);
-    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-}
-
-.filter-time-input span {
-    font-size: 12px;
-    color: var(--text-secondary);
 }
 
 /* Attribution Insights */
@@ -714,18 +670,6 @@ body {
     border-left: 4px solid #F59E0B;
     border-radius: 12px;
     animation: slideIn 0.4s ease-out;
-}
-
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 .insights-header {
@@ -752,11 +696,6 @@ body {
     color: #78350F;
 }
 
-.insights-content strong {
-    font-weight: 600;
-    color: #92400E;
-}
-
 .insights-highlight {
     display: inline-block;
     padding: 2px 6px;
@@ -765,28 +704,17 @@ body {
     font-weight: 600;
 }
 
-.empty-insights {
-    color: var(--text-secondary);
-    font-style: italic;
-    text-align: center;
-    padding: 20px;
-}
-
-/* Simulation Dashboard Styles */
 /* =========================================
-   NEW SIMULATION DASHBOARD STYLES (v2.0)
+   SIMULATION DASHBOARD STYLES
    ========================================= */
 
 .simulation-section {
-    max-width: var(--container-width);
+    max-width: 1600px;
     margin: 40px auto;
     padding: 0;
     border-radius: 12px;
-    background: transparent;
-    /* Container is transparent, items have bg */
 }
 
-/* 1. Controls Panel */
 .sim-controls-panel {
     background: white;
     padding: 24px 32px;
@@ -824,7 +752,6 @@ body {
     outline: none;
     background: transparent;
     margin-right: 10px;
-    /* Added spacing */
 }
 
 .sim-input-group .unit {
@@ -880,7 +807,6 @@ body {
 
 .sim-run-btn {
     background: #059669;
-    /* Green */
     color: white;
     padding: 14px 28px;
     border-radius: 8px;
@@ -898,10 +824,6 @@ body {
 .sim-run-btn:hover {
     background: #047857;
     transform: translateY(-1px);
-}
-
-.sim-run-btn .arrow {
-    font-size: 12px;
 }
 
 /* Channel Filters */
@@ -948,7 +870,7 @@ body {
     border-color: #CBD5E1;
 }
 
-/* 2. Summary Cards */
+/* Summary Cards */
 .sim-cards-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -997,7 +919,7 @@ body {
     color: #64748B;
 }
 
-/* 3. Bars Section */
+/* Bars Section */
 .sim-chart-section {
     background: white;
     padding: 32px;
@@ -1021,7 +943,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 24px;
-    /* Spacing between channel groups */
 }
 
 .bar-group {
@@ -1064,23 +985,18 @@ body {
     background: #CBD5E1;
 }
 
-/* Last Touch */
 .fill-green {
     background: #34D399;
 }
 
-/* Weighted Score */
 .fill-blue {
     background: #60A5FA;
 }
-
-/* U-Shape */
 
 .sim-legend {
     display: flex;
     gap: 24px;
     justify-content: flex-end;
-    /* Align right as in screenshot */
     margin-top: 32px;
     font-size: 13px;
     color: #64748B;
@@ -1110,8 +1026,7 @@ body {
     background: #60A5FA;
 }
 
-
-/* 4. Table */
+/* Table Section */
 .sim-table-section {
     background: white;
     padding: 32px;
@@ -1155,11 +1070,9 @@ body {
     font-weight: 700;
 }
 
-
-/* 5. Insight */
+/* Insight Section */
 .sim-insight-section {
     background: #EFF6FF;
-    /* Light blue bg */
     padding: 24px;
     border-radius: 12px;
     display: flex;
@@ -1200,70 +1113,4 @@ body {
     font-family: 'Courier New', monospace;
     font-size: 13px;
     color: #2563EB;
-}
-
-/* Attribution Results - Restored "Old" Design */
-.results-list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.result-item {
-    margin-bottom: 8px;
-}
-
-.result-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-}
-
-.result-channel-icon {
-    font-size: 20px;
-}
-
-.result-channel-name {
-    font-size: 15px;
-    font-weight: 600;
-    color: #2D3748;
-}
-
-.result-bar-container {
-    width: 100%;
-    height: 24px;
-    background-color: #EDF2F7;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-}
-
-.result-bar {
-    height: 100%;
-    text-align: right;
-    padding-right: 10px;
-    line-height: 24px;
-    color: white;
-    font-size: 13px;
-    font-weight: 700;
-    border-radius: 12px;
-    transition: width 0.6s ease;
-    min-width: fit-content;
-}
-
-.result-bar-green {
-    background-color: #48BB78;
-}
-
-.result-bar-blue {
-    background-color: #4299E1;
-}
-
-.result-bar-gray {
-    background-color: #A0AEC0;
-}
-
-.hidden {
-    display: none;
 }
