@@ -230,6 +230,7 @@ function updateAllResults() {
     renderAttributionInsights({ weightedScore: weighted, uShape: uShape });
 }
 
+// --- ATTRIBUTION LOGIC ---
 function renderResults(attribution, containerId) {
     const container = document.getElementById(containerId);
 
@@ -242,20 +243,33 @@ function renderResults(attribution, containerId) {
         return;
     }
 
-    const sortedKeys = Object.keys(attribution).sort((a, b) => attribution[b] - attribution[a]);
+    // NEW LOGIC: Sort by appearance in Journey (User Request)
+    // Create a list of channel IDs in the order they appear in the journey
+    // Filter out duplicates if a channel appears multiple times (though current logic prevents that, good for safety)
+    const journeyOrder = [...new Set(journey.map(item => item.id))];
+
+    // Identify any channels in attribution that are NOT in journey (e.g. from older calcs if buggy, or implicit)
+    // Usually attribution keys are subsets of journey, but let's be safe.
+    // Actually, weighted/U-shape/LastTouch logic relies on journey.
+    // So we iterate `journeyOrder`.
 
     container.innerHTML = '';
 
-    sortedKeys.forEach((channelId, index) => {
+    journeyOrder.forEach((channelId, index) => {
         const channel = channels.find(c => c.id === channelId);
         if (!channel) return;
 
-        const percentage = attribution[channelId];
-        if (percentage < 0.1) return;
+        const percentage = attribution[channelId] || 0; // Default to 0 if not attributed
+        // Show even if 0? User asked for "Order of selected steps". 
+        // If U-Shape gives 0 to middle steps (it shouldn't, gives 20%), let's show all.
 
         const resultEl = document.createElement('div');
         resultEl.className = 'result-item';
         // Flex Row: Rank | Name | Bar
+        // Modern Style: Bar fills the row, text inside or overlay? 
+        // User said "Design more beautiful, stylish modern".
+        // Let's keep the Row layout but make it cleaner.
+
         resultEl.innerHTML = `
             <div class="result-rank">#${index + 1}</div>
             <div class="result-header">
@@ -318,32 +332,74 @@ function runAdvancedSimulation() {
     setTimeout(() => {
         const fullJourneys = generateRealisticJourneys(totalSimCount);
 
+        // 1. Filtered Journeys (Combinations Included)
+        // Matches ANY journey containing ALL selected filters? Or ANY?
+        // User said "Push+Stories if selected... 3000 sales by these channels".
+        // Usually implies OR logic or AND logic? 
+        // Given "combinations", usually AND if looking for specific path impact, but let's stick to "Contains ALL selected filters" for consistency.
+        // OR better: "Contains AT LEAST ONE of the selected filters"? 
+        // Let's assume AND (Intersection) if multiple selected, or "Contains" if single.
+        // Wait, user text: "Digital, then sales only by 1 channel Digital".
+        // Let's stick to:
+        // - "Filtered Count" = Journeys containing the Selected Channel(s).
+
         let filteredJourneys = fullJourneys;
         if (selectedSimFilters.length > 0) {
             filteredJourneys = fullJourneys.filter(item => {
+                // Return true if journey path contains ALL selected filter IDs
                 return selectedSimFilters.every(filterId => item.path.includes(filterId));
             });
         }
         const filteredCount = filteredJourneys.length;
 
-        // Update Total Sales
+        // 2. Pure (Exclusive) Sales
+        // Sales where the path consists of ONLY the selected channel(s) (and nothing else).
+        // If 1 filter: ['push'] -> path == ['push']
+        // If 2 filters: ['push', 'stories'] -> path == ['push', 'stories'] (in any order? or exact?)
+        // User asked for "Purely sales by chosen channel... without combination". 
+        // This strongly implies Single-Channel Journeys for the single selected filter.
+        let pureCount = 0;
+        if (selectedSimFilters.length > 0) {
+            pureCount = fullJourneys.filter(item => {
+                if (item.path.length !== selectedSimFilters.length) return false;
+                // Check content equality
+                const pathSorted = [...item.path].sort();
+                const filterSorted = [...selectedSimFilters].sort();
+                return pathSorted.every((val, index) => val === filterSorted[index]);
+            }).length;
+        }
+
+        // Update Total Sales Card
         const totalSalesEl = document.getElementById('resTotalSales');
         const totalSalesSubEl = document.getElementById('resTotalSalesSub');
-        totalSalesEl.innerText = totalSimCount;
-        if (totalSalesSubEl) totalSalesSubEl.innerText = '100% конверсия'; // Reset text
 
-        // Update NEW Filtered Card (if exists)
+        // User Request: "Total Sales... specify how many sales with combinations"
+        // Title: Total Sales (8000)
+        // Sub: "3200 с выбранными каналами" (Filtered Count)
+        totalSalesEl.innerText = totalSimCount;
+        if (totalSalesSubEl) {
+            if (selectedSimFilters.length > 0) {
+                const percent = ((filteredCount / totalSimCount) * 100).toFixed(1);
+                totalSalesSubEl.innerHTML = `<span style="color:#2563EB">${filteredCount}</span> с выбранными (${percent}%)`;
+                totalSalesSubEl.classList.remove('text-green'); // Change color style
+            } else {
+                totalSalesSubEl.innerText = '100% конверсия';
+                totalSalesSubEl.classList.add('text-green');
+            }
+        }
+
+        // Update Filtered/Pure Card
         const filterCard = document.getElementById('simFilteredCard');
         if (filterCard) {
             if (selectedSimFilters.length > 0) {
-                const primaryName = channels.find(c => c.id === selectedSimFilters[0]).name;
-                const percent = ((filteredCount / totalSimCount) * 100).toFixed(1);
+                const filterNames = selectedSimFilters.map(id => channels.find(c => c.id === id).name).join(' + ');
+                const purePercent = ((pureCount / totalSimCount) * 100).toFixed(1);
 
                 filterCard.classList.remove('hidden');
                 filterCard.innerHTML = `
-                    <div class="card-label">ПРОДАЖИ (${primaryName}${selectedSimFilters.length > 1 ? '+' : ''})</div>
-                    <div class="card-value" style="color:#3B82F6">${filteredCount}</div>
-                    <div class="card-sub text-gray">${percent}% от общего</div>
+                    <div class="card-label">ЧИСТЫЕ ПРОДАЖИ (${filterNames})</div>
+                    <div class="card-value" style="color:#059669">${pureCount}</div>
+                    <div class="card-sub text-gray">Только этот канал(ы)</div>
                  `;
             } else {
                 filterCard.classList.add('hidden');
