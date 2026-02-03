@@ -553,16 +553,26 @@ function renderComparisonBars(results, maxBase) {
     });
 }
 
-function renderTopScenariosTable(topPaths) {
+function renderTopScenariosTable(topPaths, totalCount) {
     const tbody = document.getElementById('simTableBody');
     tbody.innerHTML = '';
+
     if (topPaths.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center">Нет данных</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Нет данных</td></tr>';
         return;
     }
+
     topPaths.forEach(item => {
         const pathStr = item.path.map(id => channels.find(c => c.id === id).name).join(' → ');
-        const row = `<tr><td>${pathStr}</td><td class="text-right"><strong>${item.count}</strong></td></tr>`;
+        const percent = ((item.count / totalCount) * 100).toFixed(1);
+
+        const row = `
+            <tr>
+                <td>${pathStr}</td>
+                <td class="text-right"><strong>${item.count}</strong></td>
+                <td class="text-right" style="color:#64748B">${percent}%</td>
+            </tr>
+        `;
         tbody.innerHTML += row;
     });
 }
