@@ -488,7 +488,7 @@ body {
     box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
 }
 
-/* Results List - V1.5 FIXED (Row Design) */
+/* Results List - V1.6 MODERN (Row Design) */
 .results-list {
     display: flex;
     flex-direction: column;
@@ -499,8 +499,11 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+    padding: 8px;
+    /* Compact padding */
     margin-bottom: 0;
     width: 100%;
+    /* No border or bg needed here for clean look, or use minimal hover */
 }
 
 @keyframes fadeIn {
@@ -517,8 +520,9 @@ body {
 
 .result-rank {
     font-size: 13px;
-    font-weight: 600;
-    color: #A0AEC0;
+    font-weight: 700;
+    color: #CBD5E0;
+    /* Subtle rank */
     width: 25px;
     flex-shrink: 0;
 }
@@ -527,7 +531,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    width: 120px;
+    width: 110px;
     /* Fixed width for name */
     flex-shrink: 0;
 }
@@ -539,16 +543,18 @@ body {
 .result-channel-name {
     font-size: 14px;
     font-weight: 600;
-    color: #2D3748;
+    color: #4A5568;
 }
 
 .result-bar-container {
     flex: 1;
     /* Take remaining space */
-    height: 32px;
-    /* Taller bars */
+    height: 36px;
+    /* Modern height */
     background-color: #F7FAFC;
-    border-radius: 6px;
+    /* Light gray track */
+    border-radius: 8px;
+    /* Rounded */
     overflow: hidden;
     position: relative;
     display: flex;
@@ -565,9 +571,12 @@ body {
     color: white;
     font-size: 13px;
     font-weight: 700;
-    border-radius: 6px;
+    border-radius: 8px;
+    /* Rounded pill match */
     transition: width 0.6s ease;
     min-width: 40px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    /* Subtle depth */
 }
 
 /* Channel Colors for Bars */

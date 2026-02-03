@@ -230,46 +230,54 @@ function updateAllResults() {
     renderAttributionInsights({ weightedScore: weighted, uShape: uShape });
 }
 
-// --- ATTRIBUTION LOGIC ---
+// --- RENDER RESULTS (Ordered by Journey or Config) ---
 function renderResults(attribution, containerId) {
     const container = document.getElementById(containerId);
 
     if (Object.keys(attribution).length === 0) {
         container.innerHTML = `
             <div class="empty-results">
-                <p>Добавьте каналы в путь клиента для расчета атрибуции</p>
+                <p>Добавьте каналы в путь...</p>
             </div>
         `;
         return;
     }
 
-    // NEW LOGIC: Sort by appearance in Journey (User Request)
-    // Create a list of channel IDs in the order they appear in the journey
-    // Filter out duplicates if a channel appears multiple times (though current logic prevents that, good for safety)
-    const journeyOrder = [...new Set(journey.map(item => item.id))];
-
-    // Identify any channels in attribution that are NOT in journey (e.g. from older calcs if buggy, or implicit)
-    // Usually attribution keys are subsets of journey, but let's be safe.
-    // Actually, weighted/U-shape/LastTouch logic relies on journey.
-    // So we iterate `journeyOrder`.
+    // Sort keys based on order in the 'journey' array
+    // If a channel appears multiple times, use first appearance.
+    // If not in journey (shouldn't happen for attribution of journey), put at end.
+    let sortedKeys;
+    if (journey.length > 0) {
+        // Create unique ordered list from journey
+        const uniqueJourneyIds = [...new Set(journey.map(item => item.id))];
+        sortedKeys = Object.keys(attribution).sort((a, b) => {
+            const idxA = uniqueJourneyIds.indexOf(a);
+            const idxB = uniqueJourneyIds.indexOf(b);
+            // If both in journey, sort by index
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            // If one in journey, it comes first
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return 0;
+        });
+    } else {
+        // Fallback to value desc
+        sortedKeys = Object.keys(attribution).sort((a, b) => attribution[b] - attribution[a]);
+    }
 
     container.innerHTML = '';
 
-    journeyOrder.forEach((channelId, index) => {
+    sortedKeys.forEach((channelId, index) => {
         const channel = channels.find(c => c.id === channelId);
         if (!channel) return;
 
-        const percentage = attribution[channelId] || 0; // Default to 0 if not attributed
-        // Show even if 0? User asked for "Order of selected steps". 
-        // If U-Shape gives 0 to middle steps (it shouldn't, gives 20%), let's show all.
+        const percentage = attribution[channelId];
+        // Show even small percentages if they exist in the journey, for clarity
+        if (percentage <= 0) return;
 
         const resultEl = document.createElement('div');
         resultEl.className = 'result-item';
         // Flex Row: Rank | Name | Bar
-        // Modern Style: Bar fills the row, text inside or overlay? 
-        // User said "Design more beautiful, stylish modern".
-        // Let's keep the Row layout but make it cleaner.
-
         resultEl.innerHTML = `
             <div class="result-rank">#${index + 1}</div>
             <div class="result-header">
@@ -332,76 +340,56 @@ function runAdvancedSimulation() {
     setTimeout(() => {
         const fullJourneys = generateRealisticJourneys(totalSimCount);
 
-        // 1. Filtered Journeys (Combinations Included)
-        // Matches ANY journey containing ALL selected filters? Or ANY?
-        // User said "Push+Stories if selected... 3000 sales by these channels".
-        // Usually implies OR logic or AND logic? 
-        // Given "combinations", usually AND if looking for specific path impact, but let's stick to "Contains ALL selected filters" for consistency.
-        // OR better: "Contains AT LEAST ONE of the selected filters"? 
-        // Let's assume AND (Intersection) if multiple selected, or "Contains" if single.
-        // Wait, user text: "Digital, then sales only by 1 channel Digital".
-        // Let's stick to:
-        // - "Filtered Count" = Journeys containing the Selected Channel(s).
-
+        // Filter Logic: "Combination"
+        // User said: "Push+Stories -> 3000 sales involving THESE".
+        // This usually means AND logic (journeys containing BOTH).
         let filteredJourneys = fullJourneys;
         if (selectedSimFilters.length > 0) {
             filteredJourneys = fullJourneys.filter(item => {
-                // Return true if journey path contains ALL selected filter IDs
                 return selectedSimFilters.every(filterId => item.path.includes(filterId));
             });
         }
         const filteredCount = filteredJourneys.length;
 
-        // 2. Pure (Exclusive) Sales
-        // Sales where the path consists of ONLY the selected channel(s) (and nothing else).
-        // If 1 filter: ['push'] -> path == ['push']
-        // If 2 filters: ['push', 'stories'] -> path == ['push', 'stories'] (in any order? or exact?)
-        // User asked for "Purely sales by chosen channel... without combination". 
-        // This strongly implies Single-Channel Journeys for the single selected filter.
-        let pureCount = 0;
-        if (selectedSimFilters.length > 0) {
-            pureCount = fullJourneys.filter(item => {
-                if (item.path.length !== selectedSimFilters.length) return false;
-                // Check content equality
-                const pathSorted = [...item.path].sort();
-                const filterSorted = [...selectedSimFilters].sort();
-                return pathSorted.every((val, index) => val === filterSorted[index]);
-            }).length;
-        }
-
-        // Update Total Sales Card
+        // 1. Total Sales Card
+        // User Requirement: "Show how many sales involved the combination"
+        // E.g. "3000 (Filtered) / 8000 (Total)"
         const totalSalesEl = document.getElementById('resTotalSales');
         const totalSalesSubEl = document.getElementById('resTotalSalesSub');
 
-        // User Request: "Total Sales... specify how many sales with combinations"
-        // Title: Total Sales (8000)
-        // Sub: "3200 с выбранными каналами" (Filtered Count)
-        totalSalesEl.innerText = totalSimCount;
-        if (totalSalesSubEl) {
-            if (selectedSimFilters.length > 0) {
-                const percent = ((filteredCount / totalSimCount) * 100).toFixed(1);
-                totalSalesSubEl.innerHTML = `<span style="color:#2563EB">${filteredCount}</span> с выбранными (${percent}%)`;
-                totalSalesSubEl.classList.remove('text-green'); // Change color style
-            } else {
-                totalSalesSubEl.innerText = '100% конверсия';
-                totalSalesSubEl.classList.add('text-green');
-            }
+        if (selectedSimFilters.length > 0) {
+            const percent = ((filteredCount / totalSimCount) * 100).toFixed(1);
+            totalSalesEl.innerHTML = `${filteredCount} <span style="font-size:20px; color:#94A3B8; font-weight:600;">/ ${totalSimCount}</span>`;
+            if (totalSalesSubEl) totalSalesSubEl.innerText = `${percent}% содержат выбранные каналы`;
+        } else {
+            totalSalesEl.innerText = totalSimCount;
+            if (totalSalesSubEl) totalSalesSubEl.innerText = '100% конверсия';
         }
 
-        // Update Filtered/Pure Card
+        // 2. Filtered Sales Card (Pure Sales)
+        // User Requirement: "Pure quantity for 1 selected channel WITHOUT combinations"
+        // AND "If Digital, only 1 channel Digital"
         const filterCard = document.getElementById('simFilteredCard');
         if (filterCard) {
-            if (selectedSimFilters.length > 0) {
-                const filterNames = selectedSimFilters.map(id => channels.find(c => c.id === id).name).join(' + ');
+            if (selectedSimFilters.length === 1) {
+                const filterId = selectedSimFilters[0];
+                const primaryChannel = channels.find(c => c.id === filterId);
+
+                // Pure Count: Path length is 1 AND path[0] is the filterId
+                const pureCount = fullJourneys.filter(j => j.path.length === 1 && j.path[0] === filterId).length;
                 const purePercent = ((pureCount / totalSimCount) * 100).toFixed(1);
 
                 filterCard.classList.remove('hidden');
                 filterCard.innerHTML = `
-                    <div class="card-label">ЧИСТЫЕ ПРОДАЖИ (${filterNames})</div>
-                    <div class="card-value" style="color:#059669">${pureCount}</div>
-                    <div class="card-sub text-gray">Только этот канал(ы)</div>
+                    <div class="card-label">ЧИСТЫЕ ПРОДАЖИ (${primaryChannel.name})</div>
+                    <div class="card-value" style="color:#3B82F6">${pureCount}</div>
+                    <div class="card-sub text-gray">${purePercent}% (без других каналов)</div>
                  `;
             } else {
+                // If multiple filters or none, hide this card? 
+                // User said "If 2, show first". But Pure Sales for a subset? 
+                // "If 2 channels selected" -> Pure sales for the COMBINATION implies "Only Digital+Stories"? 
+                // Let's stick to hiding if >1 for now to avoid confusion, or show Pure Intersection.
                 filterCard.classList.add('hidden');
             }
         }
@@ -419,10 +407,15 @@ function runAdvancedSimulation() {
             const bestPathPercent = ((bestPath.count / filteredCount) * 100).toFixed(1) + '% от выборки';
             document.getElementById('resTopPath').innerText = bestPathStr;
             document.getElementById('resTopPathPercent').innerText = bestPathPercent;
+        } else {
+            document.getElementById('resTopPath').innerText = "-";
+            document.getElementById('resTopPathPercent').innerText = "";
         }
 
         renderComparisonBars(results, filteredCount);
         renderTopScenariosTable(topPaths);
+        // Pass filteredJourneys to insights for solo/mix breakdown text if needed
+        renderAdvancedInsights(results, applyStoriesLogic, applyOfflineLogic, filteredJourneys);
 
         btn.innerHTML = '<span class="arrow">▶</span> Смоделировать';
         btn.disabled = false;
