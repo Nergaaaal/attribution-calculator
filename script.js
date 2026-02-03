@@ -413,7 +413,7 @@ function runAdvancedSimulation() {
         }
 
         renderComparisonBars(results, filteredCount);
-        renderTopScenariosTable(topPaths);
+        renderTopScenariosTable(topPaths, filteredCount);
         // Pass filteredJourneys to insights for solo/mix breakdown text if needed
         renderAdvancedInsights(results, applyStoriesLogic, applyOfflineLogic, filteredJourneys);
 
