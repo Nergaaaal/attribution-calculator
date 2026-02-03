@@ -1055,6 +1055,20 @@ body {
     /* Add scroll */
 }
 
+/* 4. Table Section */
+.sim-table-section {
+    background: white;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid #E2E8F0;
+    margin-bottom: 24px;
+    max-height: 600px;
+    /* Limit height */
+    overflow-y: auto;
+    /* Add scroll */
+}
+
 .sim-table {
     width: 100%;
     border-collapse: collapse;
@@ -1067,6 +1081,16 @@ body {
     color: #94A3B8;
     padding-bottom: 16px;
     border-bottom: 1px solid #E2E8F0;
+    white-space: nowrap;
+    /* Prevent wrap */
+}
+
+/* Fixed Width Column Class */
+.col-number {
+    width: 110px;
+    /* Fixed width for alignment */
+    text-align: right;
+    padding-right: 8px;
 }
 
 .sim-table td {
@@ -1074,6 +1098,7 @@ body {
     border-bottom: 1px solid #F1F5F9;
     font-size: 14px;
     color: #334155;
+    vertical-align: middle;
 }
 
 .sim-table td:first-child {

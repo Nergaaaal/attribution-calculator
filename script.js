@@ -569,8 +569,8 @@ function renderTopScenariosTable(topPaths, totalCount) {
         const row = `
             <tr>
                 <td>${pathStr}</td>
-                <td class="text-right"><strong>${item.count}</strong></td>
-                <td class="text-right" style="color:#64748B">${percent}%</td>
+                <td class="col-number"><strong>${item.count}</strong></td>
+                <td class="col-number" style="color:#64748B">${percent}%</td>
             </tr>
         `;
         tbody.innerHTML += row;
