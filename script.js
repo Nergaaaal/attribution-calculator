@@ -515,7 +515,7 @@ function analyzePathFrequencies(dataset) {
         count: counts[key]
     })).sort((a, b) => b.count - a.count);
 
-    return sorted; // Return all paths, no truncation
+    return sorted;
 }
 
 function renderComparisonBars(results, maxBase) {
