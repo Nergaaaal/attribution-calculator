@@ -462,17 +462,25 @@ function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
         lastTouchTotals[path[n - 1]] += revenue;
 
         // U-Shape
-        if (n === 1) {
-            uShapeTotals[path[0]] += revenue;
-        } else if (n === 2) {
-            uShapeTotals[path[0]] += revenue * 0.5;
-            uShapeTotals[path[1]] += revenue * 0.5;
-        } else {
-            uShapeTotals[path[0]] += revenue * 0.4;
-            uShapeTotals[path[n - 1]] += revenue * 0.4;
-            const mid = (revenue * 0.2) / (n - 2);
-            for (let k = 1; k < n - 1; k++) {
-                uShapeTotals[path[k]] += mid;
+        // FIX: If Stories logic is active, it shouldn't be counted in position-based logic (acting as if it didn't exist)
+        let uShapePath = [...path];
+        if (useStoriesLogic) {
+            uShapePath = uShapePath.filter(id => id !== 'stories');
+        }
+
+        const un = uShapePath.length;
+
+        if (un === 1) {
+            uShapeTotals[uShapePath[0]] += revenue;
+        } else if (un === 2) {
+            uShapeTotals[uShapePath[0]] += revenue * 0.5;
+            uShapeTotals[uShapePath[1]] += revenue * 0.5;
+        } else if (un > 2) {
+            uShapeTotals[uShapePath[0]] += revenue * 0.4;
+            uShapeTotals[uShapePath[un - 1]] += revenue * 0.4;
+            const mid = (revenue * 0.2) / (un - 2);
+            for (let k = 1; k < un - 1; k++) {
+                uShapeTotals[uShapePath[k]] += mid;
             }
         }
 
