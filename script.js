@@ -598,3 +598,40 @@ function renderTopScenariosTable(topPaths, totalCount) {
         tbody.innerHTML += row;
     });
 }
+
+// Restoration of missing function to fix crash
+function renderAdvancedInsights(results, useStories, useOffline, filteredJourneys) {
+    const container = document.getElementById('simInsightText');
+    const storiesScoreVal = document.getElementById('insightStoriesScore');
+    const offlineScoreVal = document.getElementById('insightOfflineScore');
+
+    // Update config snippet
+    if (storiesScoreVal) storiesScoreVal.innerText = useStories ? '0 (Активно)' : '2';
+    if (offlineScoreVal) offlineScoreVal.innerText = useOffline ? '0 (Исключен)' : '5';
+
+    if (!container || !results.weighted || !results.uShape) return;
+
+    // Analyze difference for Telemarketing or Digital
+    const tm = 'telemarketing';
+    const dig = 'digital';
+
+    // Safety check
+    const wTM = results.weighted[tm] || 0;
+    const uTM = results.uShape[tm] || 0;
+
+    let text = "Ваша модель ";
+    if (wTM > uTM * 1.1) {
+        const diff = ((wTM - uTM) / (uTM || 1) * 100).toFixed(0);
+        text += `начисляет Телемаркетингу на ${diff}% больше продаж, чем U-Shape, так как вы задали ему высокий балл (5).`;
+    } else if (uTM > wTM * 1.1) {
+        text += `снижает вклад Телемаркетинга по сравнению с U-Shape.`;
+    } else {
+        text += `показывает схожие результаты с U-Shape для основных каналов.`;
+    }
+
+    if (useStories) {
+        text += " <br>При этом <b>Stories</b> полностью исключены из атрибуции (score=0), игнорируя их позицию.";
+    }
+
+    container.innerHTML = text;
+}
