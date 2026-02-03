@@ -337,88 +337,83 @@ function runAdvancedSimulation() {
     btn.disabled = true;
 
     setTimeout(() => {
-        const fullJourneys = generateRealisticJourneys(totalSimCount);
+        try {
+            const fullJourneys = generateRealisticJourneys(totalSimCount);
 
-        // Filter Logic: "Combination"
-        // User said: "Push+Stories -> 3000 sales involving THESE".
-        // This usually means AND logic (journeys containing BOTH).
-        let filteredJourneys = fullJourneys;
-        if (selectedSimFilters.length > 0) {
-            filteredJourneys = fullJourneys.filter(item => {
-                return selectedSimFilters.every(filterId => item.path.includes(filterId));
-            });
-        }
-        const filteredCount = filteredJourneys.length;
-
-        // 1. Total Sales Card
-        // User Requirement: "Show how many sales involved the combination"
-        // E.g. "3000 (Filtered) / 8000 (Total)"
-        const totalSalesEl = document.getElementById('resTotalSales');
-        const totalSalesSubEl = document.getElementById('resTotalSalesSub');
-
-        if (selectedSimFilters.length > 0) {
-            const percent = ((filteredCount / totalSimCount) * 100).toFixed(1);
-            totalSalesEl.innerHTML = `${filteredCount} <span style="font-size:20px; color:#94A3B8; font-weight:600;">/ ${totalSimCount}</span>`;
-            if (totalSalesSubEl) totalSalesSubEl.innerText = `${percent}% содержат выбранные каналы`;
-        } else {
-            totalSalesEl.innerText = totalSimCount;
-            if (totalSalesSubEl) totalSalesSubEl.innerText = '100% конверсия';
-        }
-
-        // 2. Filtered Sales Card (Pure Sales)
-        // User Requirement: "Pure quantity for 1 selected channel WITHOUT combinations"
-        // AND "If Digital, only 1 channel Digital"
-        const filterCard = document.getElementById('simFilteredCard');
-        if (filterCard) {
-            if (selectedSimFilters.length === 1) {
-                const filterId = selectedSimFilters[0];
-                const primaryChannel = channels.find(c => c.id === filterId);
-
-                // Pure Count: Path length is 1 AND path[0] is the filterId
-                const pureCount = fullJourneys.filter(j => j.path.length === 1 && j.path[0] === filterId).length;
-                const purePercent = ((pureCount / totalSimCount) * 100).toFixed(1);
-
-                filterCard.classList.remove('hidden');
-                filterCard.innerHTML = `
-                    <div class="card-label">ЧИСТЫЕ ПРОДАЖИ (${primaryChannel.name})</div>
-                    <div class="card-value" style="color:#3B82F6">${pureCount}</div>
-                    <div class="card-sub text-gray">${purePercent}% (без других каналов)</div>
-                 `;
-            } else {
-                // If multiple filters or none, hide this card? 
-                // User said "If 2, show first". But Pure Sales for a subset? 
-                // "If 2 channels selected" -> Pure sales for the COMBINATION implies "Only Digital+Stories"? 
-                // Let's stick to hiding if >1 for now to avoid confusion, or show Pure Intersection.
-                filterCard.classList.add('hidden');
+            // Filter Logic
+            let filteredJourneys = fullJourneys;
+            if (selectedSimFilters.length > 0) {
+                filteredJourneys = fullJourneys.filter(item => {
+                    return selectedSimFilters.every(filterId => item.path.includes(filterId));
+                });
             }
+            const filteredCount = filteredJourneys.length;
+
+            // 1. Total Sales Card
+            const totalSalesEl = document.getElementById('resTotalSales');
+            const totalSalesSubEl = document.getElementById('resTotalSalesSub');
+
+            if (selectedSimFilters.length > 0) {
+                const percent = ((filteredCount / totalSimCount) * 100).toFixed(1);
+                totalSalesEl.innerHTML = `${filteredCount} <span style="font-size:20px; color:#94A3B8; font-weight:600;">/ ${totalSimCount}</span>`;
+                if (totalSalesSubEl) totalSalesSubEl.innerText = `${percent}% содержат выбранные каналы`;
+            } else {
+                totalSalesEl.innerText = totalSimCount;
+                if (totalSalesSubEl) totalSalesSubEl.innerText = '100% конверсия';
+            }
+
+            // 2. Filtered Sales Card
+            const filterCard = document.getElementById('simFilteredCard');
+            if (filterCard) {
+                if (selectedSimFilters.length === 1) {
+                    const filterId = selectedSimFilters[0];
+                    const primaryChannel = channels.find(c => c.id === filterId);
+
+                    const pureCount = fullJourneys.filter(j => j.path.length === 1 && j.path[0] === filterId).length;
+                    const purePercent = ((pureCount / totalSimCount) * 100).toFixed(1);
+
+                    filterCard.classList.remove('hidden');
+                    filterCard.innerHTML = `
+                        <div class="card-label">ЧИСТЫЕ ПРОДАЖИ (${primaryChannel.name})</div>
+                        <div class="card-value" style="color:#3B82F6">${pureCount}</div>
+                        <div class="card-sub text-gray">${purePercent}% (без других каналов)</div>
+                    `;
+                } else {
+                    filterCard.classList.add('hidden');
+                }
+            }
+
+            // Calculate & Render Rest
+            const results = calculateThreeModels(filteredJourneys, applyStoriesLogic, applyOfflineLogic);
+            const topPaths = analyzePathFrequencies(filteredJourneys);
+
+            resultsDiv.classList.remove('hidden');
+
+            // Top Path
+            if (topPaths.length > 0) {
+                const bestPath = topPaths[0];
+                const bestPathStr = bestPath.path.map(id => channels.find(c => c.id === id).name).join(' → ');
+                const bestPathPercent = ((bestPath.count / filteredCount) * 100).toFixed(1) + '% от выборки';
+                document.getElementById('resTopPath').innerText = bestPathStr;
+                document.getElementById('resTopPathPercent').innerText = bestPathPercent;
+            } else {
+                document.getElementById('resTopPath').innerText = "-";
+                document.getElementById('resTopPathPercent').innerText = "";
+            }
+
+            renderComparisonBars(results, filteredCount);
+            renderTopScenariosTable(topPaths, filteredCount);
+            renderAdvancedInsights(results, applyStoriesLogic, applyOfflineLogic, filteredJourneys);
+
+            resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        } catch (e) {
+            console.error("Simulation Error:", e);
+            alert("Произошла ошибка при расчете. Проверьте консоль.");
+        } finally {
+            btn.innerHTML = '<span class="arrow">▶</span> Смоделировать';
+            btn.disabled = false;
         }
-
-        // Calculate & Render Rest
-        const results = calculateThreeModels(filteredJourneys, applyStoriesLogic, applyOfflineLogic);
-        const topPaths = analyzePathFrequencies(filteredJourneys);
-
-        resultsDiv.classList.remove('hidden');
-
-        // Top Path
-        if (topPaths.length > 0) {
-            const bestPath = topPaths[0];
-            const bestPathStr = bestPath.path.map(id => channels.find(c => c.id === id).name).join(' → ');
-            const bestPathPercent = ((bestPath.count / filteredCount) * 100).toFixed(1) + '% от выборки';
-            document.getElementById('resTopPath').innerText = bestPathStr;
-            document.getElementById('resTopPathPercent').innerText = bestPathPercent;
-        } else {
-            document.getElementById('resTopPath').innerText = "-";
-            document.getElementById('resTopPathPercent').innerText = "";
-        }
-
-        renderComparisonBars(results, filteredCount);
-        renderTopScenariosTable(topPaths, filteredCount);
-        // Pass filteredJourneys to insights for solo/mix breakdown text if needed
-        renderAdvancedInsights(results, applyStoriesLogic, applyOfflineLogic, filteredJourneys);
-
-        btn.innerHTML = '<span class="arrow">▶</span> Смоделировать';
-        btn.disabled = false;
-        resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     }, 600);
 }
