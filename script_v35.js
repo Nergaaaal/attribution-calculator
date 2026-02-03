@@ -1,5 +1,5 @@
 const channels = [
-    { id: 'digital', name: 'Digital Ads', icon: '🎯', score: 0.1, color: 'digital' },
+    { id: 'digital', name: 'Digital Ads', icon: '🎯', score: 2, color: 'digital' },
     { id: 'stories', name: 'Stories', icon: '📱', score: 2, color: 'stories' },
     { id: 'push', name: 'Push', icon: '🔔', score: 3, color: 'push' },
     { id: 'sms', name: 'SMS', icon: '💬', score: 3, color: 'sms' },
