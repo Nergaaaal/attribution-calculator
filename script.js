@@ -66,7 +66,8 @@ function updateChannelScore(channelId, newScore) {
 
 function addToJourney(channelId) {
     if (journey.length < 8) {
-        journey.push(channelId);
+        // Journey item is now an object to hold state: { id, logicActive }
+        journey.push({ id: channelId, logicActive: false });
         renderJourney();
         updateAllResults();
     } else {
@@ -90,23 +91,48 @@ function renderJourney() {
     container.innerHTML = '';
     let totalScore = 0;
 
-    // Use a wrapper for horizontal layout if needed, but style.css handles .journey-steps
     const stepsWrapper = document.createElement('div');
     stepsWrapper.className = 'journey-steps';
 
-    journey.forEach((channelId, index) => {
-        const channel = channels.find(c => c.id === channelId);
-        totalScore += channel.score;
+    journey.forEach((item, index) => {
+        const channel = channels.find(c => c.id === item.id);
+
+        // Calculate score based on logic
+        let effectiveScore = channel.score;
+        // Logic 1: Stories < 1h -> Score 0
+        if (item.id === 'stories' && item.logicActive) effectiveScore = 0;
+        // Logic 2: Offline Reject -> Score 2 (instead of 5)
+        if (item.id === 'offline' && item.logicActive) effectiveScore = 2;
+
+        totalScore += effectiveScore;
 
         const node = document.createElement('div');
-        node.className = 'journey-step';
+        node.className = `journey-step border-${channel.color}`;
+
+        let logicHtml = '';
+        if (item.id === 'stories') {
+            logicHtml = `
+                <div style="margin-top:4px; display:flex; align-items:center; gap:6px; font-size:11px; color:#718096; background:#edf2f7; padding:4px 8px; border-radius:4px;">
+                    <input type="checkbox" ${item.logicActive ? 'checked' : ''} onchange="toggleJourneyLogic(${index})">
+                    Вход менее 1ч (Score 0)
+                </div>`;
+        }
+        if (item.id === 'offline') {
+            logicHtml = `
+                <div style="margin-top:4px; display:flex; align-items:center; gap:6px; font-size:11px; color:#718096; background:#edf2f7; padding:4px 8px; border-radius:4px;">
+                    <input type="checkbox" ${item.logicActive ? 'checked' : ''} onchange="toggleJourneyLogic(${index})">
+                    Отказ в App (Score 2)
+                </div>`;
+        }
+
         node.innerHTML = `
             <div class="step-number">${index + 1}</div>
             <div class="step-icon channel-${channel.color}">${channel.icon}</div>
             <div class="step-info">
                 <div class="step-name">${channel.name}</div>
-                <div class="step-description">(${channel.score} балла)</div>
+                ${logicHtml}
             </div>
+             <div class="step-score" style="font-weight:700; color:#CBD5E0; font-size:14px;">${effectiveScore}б</div>
             <button class="delete-btn" onclick="removeFromJourney(${index})">×</button>
         `;
         stepsWrapper.appendChild(node);
@@ -117,6 +143,14 @@ function renderJourney() {
     document.getElementById('totalScore').innerText = totalScore.toFixed(1);
 }
 
+function toggleJourneyLogic(index) {
+    if (journey[index]) {
+        journey[index].logicActive = !journey[index].logicActive;
+        renderJourney();
+        updateAllResults();
+    }
+}
+
 function removeFromJourney(index) {
     journey.splice(index, 1);
     renderJourney();
@@ -124,6 +158,72 @@ function removeFromJourney(index) {
 }
 
 // --- ATTRIBUTION LOGIC ---
+
+function getFilteredJourney() {
+    return journey.map(item => item.id);
+}
+
+// Update Calculations to use journey objects logic
+function calculateWeightedScore() {
+    if (journey.length === 0) return {};
+
+    let sum = 0;
+    const scores = journey.map(item => {
+        const ch = channels.find(c => c.id === item.id);
+        let s = ch ? ch.score : 0;
+        if (item.id === 'stories' && item.logicActive) s = 0;
+        if (item.id === 'offline' && item.logicActive) s = 2; // Simulated reject logic
+        return s;
+    });
+
+    sum = scores.reduce((a, b) => a + b, 0);
+    if (sum === 0) return {};
+
+    const result = {};
+    journey.forEach((item, idx) => {
+        const score = scores[idx];
+        const share = (score / sum) * 100;
+        result[item.id] = (result[item.id] || 0) + share;
+    });
+
+    return result;
+}
+
+function calculateUShape() {
+    const ids = journey.map(j => j.id);
+    const n = ids.length;
+    if (n === 0) return {};
+
+    const result = {};
+    ids.forEach(id => result[id] = 0);
+
+    if (n === 1) {
+        result[ids[0]] = 100;
+    } else if (n === 2) {
+        result[ids[0]] += 50;
+        result[ids[1]] += 50;
+    } else {
+        result[ids[0]] += 40;
+        result[ids[n - 1]] += 40;
+        const middleShare = 20 / (n - 2);
+        for (let i = 1; i < n - 1; i++) {
+            result[ids[i]] += middleShare;
+        }
+    }
+    return result;
+}
+
+function calculateLastTouch() {
+    if (journey.length === 0) return {};
+    const lastId = journey[journey.length - 1].id;
+    return { [lastId]: 100 };
+}
+
+function calculateFirstTouch() {
+    if (journey.length === 0) return {};
+    const firstId = journey[0].id;
+    return { [firstId]: 100 };
+}
 
 function updateAllResults() {
     const weighted = calculateWeightedScore();
@@ -138,79 +238,12 @@ function updateAllResults() {
     const firstTouch = calculateFirstTouch();
     renderResults(firstTouch, 'firstTouchResults');
 
-    renderAttributionInsights({
-        weightedScore: weighted,
-        uShape: uShape
-    });
+    // Insight (comparing only first logic item roughly)
+    // No specific comparison logic needed for main app yet, kept previous
+    renderAttributionInsights({ weightedScore: weighted, uShape: uShape });
 }
 
-function getFilteredJourney() {
-    return journey;
-}
-
-function calculateWeightedScore() {
-    const filtered = getFilteredJourney();
-    if (filtered.length === 0) return {};
-
-    let sum = 0;
-    const channelScores = filtered.map(id => {
-        const ch = channels.find(c => c.id === id);
-        return ch ? ch.score : 0;
-    });
-    sum = channelScores.reduce((a, b) => a + b, 0);
-
-    if (sum === 0) return {};
-
-    const result = {};
-    filtered.forEach((id, idx) => {
-        const score = channelScores[idx];
-        const share = (score / sum) * 100;
-        result[id] = (result[id] || 0) + share;
-    });
-
-    return result;
-}
-
-function calculateUShape() {
-    const filtered = getFilteredJourney();
-    const n = filtered.length;
-    if (n === 0) return {};
-
-    const result = {};
-    filtered.forEach(id => result[id] = 0);
-
-    if (n === 1) {
-        result[filtered[0]] = 100;
-    } else if (n === 2) {
-        result[filtered[0]] += 50;
-        result[filtered[1]] += 50;
-    } else {
-        result[filtered[0]] += 40;
-        result[filtered[n - 1]] += 40;
-        const middleShare = 20 / (n - 2);
-        for (let i = 1; i < n - 1; i++) {
-            result[filtered[i]] += middleShare;
-        }
-    }
-
-    return result;
-}
-
-function calculateLastTouch() {
-    const filtered = getFilteredJourney();
-    if (filtered.length === 0) return {};
-    const lastChannelId = filtered[filtered.length - 1];
-    return { [lastChannelId]: 100 };
-}
-
-function calculateFirstTouch() {
-    const filtered = getFilteredJourney();
-    if (filtered.length === 0) return {};
-    const firstChannelId = filtered[0];
-    return { [firstChannelId]: 100 };
-}
-
-// Render attribution results (Restored "Old" Design)
+// NEW Render Results (Row Layout)
 function renderResults(attribution, containerId) {
     const container = document.getElementById(containerId);
 
@@ -223,31 +256,27 @@ function renderResults(attribution, containerId) {
         return;
     }
 
-    // Sort by value desc
     const sortedKeys = Object.keys(attribution).sort((a, b) => attribution[b] - attribution[a]);
 
     container.innerHTML = '';
 
-    sortedKeys.forEach((channelId) => {
+    sortedKeys.forEach((channelId, index) => {
         const channel = channels.find(c => c.id === channelId);
         if (!channel) return;
 
         const percentage = attribution[channelId];
         if (percentage < 0.1) return;
 
-        let colorClass = 'gray';
-        if (containerId.includes('weighted')) colorClass = 'green';
-        if (containerId.includes('ushape')) colorClass = 'blue';
-
         const resultEl = document.createElement('div');
         resultEl.className = 'result-item';
+        // Flex Row: Rank | Name | Bar
         resultEl.innerHTML = `
+            <div class="result-rank">#${index + 1}</div>
             <div class="result-header">
-                <span class="result-channel-icon">${channel.icon}</span>
                 <span class="result-channel-name">${channel.name}</span>
             </div>
             <div class="result-bar-container">
-                <div class="result-bar result-bar-${colorClass}" style="width: ${percentage}%">
+                <div class="result-bar bg-${channel.color}" style="width: ${percentage}%">
                     ${percentage.toFixed(1)}%
                 </div>
             </div>
@@ -288,11 +317,11 @@ function renderAttributionInsights(results) {
     if (isOvervalued) {
         message = `По сравнению с рыночным стандартом (U-Shape), Ваша модель <strong>переоценивает</strong> канал 
             <span class="insights-highlight">${top.channel.name}</span> 
-            на <strong>${diffPercent}%</strong>. Это может привести к излишнему финансированию этого канала.`;
+            на <strong>${diffPercent}%</strong>.`;
     } else {
         message = `По сравнению с рыночным стандартом (U-Shape), Ваша модель <strong>недооценивает</strong> канал 
             <span class="insights-highlight">${top.channel.name}</span> 
-            на <strong>${diffPercent}%</strong>. Это может привести к ошибочному решению сократить бюджет на этот канал.`;
+            на <strong>${diffPercent}%</strong>.`;
     }
 
     container.innerHTML = `
@@ -305,7 +334,6 @@ function renderAttributionInsights(results) {
         </div>
     `;
 }
-
 
 // -------------------------------------------------------------
 // FILTER CHIPS LOGIC
@@ -334,7 +362,6 @@ function toggleSimFilter(id) {
     }
     renderSimFilters();
 }
-
 
 // -------------------------------------------------------------
 // ADVANCED SIMULATION DASHBOARD LOGIC (v2.1 - With Filters)
@@ -380,12 +407,25 @@ function runAdvancedSimulation() {
         resultsDiv.classList.remove('hidden');
 
         // Cards
+        const totalSalesEl = document.getElementById('resTotalSales');
+        const totalSalesSubEl = document.getElementById('resTotalSalesSub');
+
         if (selectedSimFilters.length > 0) {
-            document.getElementById('resTotalSales').innerHTML = `${filteredCount} <span style="font-size:14px; color:#94A3B8">из ${totalSimCount}</span>`;
-            document.getElementById('resTotalSales').nextElementSibling.innerText = 'По выбранным каналам';
+            // New Requirement: Add data about sales from 1 selected channel next to Total Sales
+            const primaryFilterId = selectedSimFilters[0];
+            const primaryName = getChannelName(primaryFilterId);
+
+            totalSalesEl.innerHTML = `
+                ${totalSimCount} 
+                <span style="font-size:16px; color:#3B82F6; margin-left:8px; font-weight:600;">
+                     (${primaryName}: ${filteredCount})
+                </span>`;
+
+            // totalSalesSubEl might not exist in original HTML, checking existence
+            if (totalSalesSubEl) totalSalesSubEl.innerText = `${((filteredCount / totalSimCount) * 100).toFixed(1)}% от общего`;
         } else {
-            document.getElementById('resTotalSales').innerText = totalSimCount;
-            document.getElementById('resTotalSales').nextElementSibling.innerText = '100% конверсия';
+            totalSalesEl.innerText = totalSimCount;
+            if (totalSalesSubEl) totalSalesSubEl.innerText = '100% конверсия';
         }
 
         // Top Path
@@ -435,24 +475,19 @@ function generateRealisticJourneys(count) {
         let journey = [];
         const rand = Math.random();
 
-        // 20% - The "Problem" path (Push -> Stories -> Offline)
         if (rand < 0.20) {
             journey = ['push', 'stories', 'offline'];
         }
-        // 15% - Digital -> Stories -> Telemarketing
         else if (rand < 0.35) {
             journey = ['digital', 'stories', 'telemarketing'];
         }
-        // 10% - Digital -> Offline
         else if (rand < 0.45) {
             journey = ['digital', 'offline'];
         }
-        // 15% - PURE Single Channel (Direct)
         else if (rand < 0.60) {
             const randomCh = channelIds[Math.floor(Math.random() * channelIds.length)];
             journey = [randomCh];
         }
-        // Others - Random Mixed (2-4 steps)
         else {
             const len = Math.floor(Math.random() * 3) + 2;
             for (let j = 0; j < len; j++) {
@@ -462,63 +497,6 @@ function generateRealisticJourneys(count) {
         dataset.push({ path: journey });
     }
     return dataset;
-}
-
-// ... calculation functions ...
-
-function renderAdvancedInsights(results, storiesLogic, offlineLogic, filteredJourneys) {
-    const container = document.getElementById('simInsightText');
-    let htmlContent = '';
-
-    // 1. SOLO vs MIXED STATS (If 1 filter active)
-    if (selectedSimFilters.length === 1 && filteredJourneys) {
-        const filterId = selectedSimFilters[0];
-        const filterName = getChannelName(filterId);
-
-        const total = filteredJourneys.length;
-        const soloCount = filteredJourneys.filter(j => j.path.length === 1 && j.path[0] === filterId).length;
-        const mixedCount = total - soloCount;
-
-        const soloPercent = ((soloCount / total) * 100).toFixed(1);
-        const mixedPercent = ((mixedCount / total) * 100).toFixed(1);
-
-        htmlContent += `
-            <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">
-                <strong>Анализ канала ${filterName}:</strong><br>
-                • Чистые продажи (Solo): <b>${soloCount}</b> (${soloPercent}%)<br>
-                • В связке (Mix): <b>${mixedCount}</b> (${mixedPercent}%)
-            </div>
-        `;
-    }
-
-    // 2. MODEL COMPARISON INSIGHT
-    const tmId = 'telemarketing';
-    const tmWeighted = results.weighted[tmId] || 0;
-    const tmUShape = results.uShape[tmId] || 0;
-
-    let diffText = '';
-
-    if (tmWeighted > tmUShape) {
-        let diff = 0;
-        if (tmUShape > 0) diff = ((tmWeighted - tmUShape) / tmUShape) * 100;
-        else diff = 100;
-        diffText = `Ваша модель "Score" присваивает Телемаркетингу (TM) на <strong>${diff.toFixed(0)}% больше продаж</strong>, чем U-Shape. Это происходит из-за высокого балла (5).`;
-    } else {
-        diffText = `Ваша модель показывает схожие результаты с U-Shape.`;
-    }
-
-    htmlContent += diffText;
-
-    const logicText = storiesLogic ?
-        `<br><br>Логика "Stories < 1h" работает: часть касаний сторис была исключена (score=0), что перераспределило вес на другие каналы.` :
-        `<br><br>Логика "Stories < 1h" выключена.`;
-
-    htmlContent += logicText;
-
-    container.innerHTML = htmlContent;
-
-    document.getElementById('insightStoriesScore').innerText = storiesLogic ? '0' : 'Current';
-    document.getElementById('insightOfflineScore').innerText = offlineLogic ? '2' : 'Current';
 }
 
 function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
@@ -534,10 +512,6 @@ function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
 
     dataset.forEach(row => {
         let path = [...row.path];
-
-        // Simulating logic modification...
-        // For simplicity in this demo, logic affects SCORES, not path structure usually.
-        // But for advanced simulation, let's keep it simple.
 
         const n = path.length;
         const revenue = 1;
@@ -567,7 +541,7 @@ function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
             let score = chObj ? chObj.score : 1;
 
             if (useStoriesLogic && channelId === 'stories') score = 0;
-            if (useOfflineLogic && channelId === 'offline') score = 2; // Reduced from 5
+            if (useOfflineLogic && channelId === 'offline') score = 2;
 
             return { id: channelId, score: score };
         });
@@ -603,7 +577,6 @@ function renderComparisonBars(results, maxBase) {
     const container = document.getElementById('simBarsContainer');
     container.innerHTML = '';
 
-    // If empty
     if (maxBase === 0) {
         container.innerHTML = '<div style="text-align:center;color:#94A3B8;padding:20px">Нет данных по выбранным фильтрам</div>';
         return;
@@ -659,7 +632,31 @@ function renderTopScenariosTable(topPaths) {
     });
 }
 
-function renderAdvancedInsights(results, storiesLogic, offlineLogic) {
+function renderAdvancedInsights(results, storiesLogic, offlineLogic, filteredJourneys) {
+    const container = document.getElementById('simInsightText');
+    let htmlContent = '';
+
+    // 1. SOLO vs MIXED STATS
+    if (selectedSimFilters.length === 1 && filteredJourneys) {
+        const filterId = selectedSimFilters[0];
+        const filterName = getChannelName(filterId);
+
+        const total = filteredJourneys.length;
+        const soloCount = filteredJourneys.filter(j => j.path.length === 1 && j.path[0] === filterId).length;
+        const mixedCount = total - soloCount;
+
+        const soloPercent = ((soloCount / total) * 100).toFixed(1);
+        const mixedPercent = ((mixedCount / total) * 100).toFixed(1);
+
+        htmlContent += `
+            <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">
+                <strong>Анализ канала ${filterName}:</strong><br>
+                • Чистые продажи (Solo): <b>${soloCount}</b> (${soloPercent}%)<br>
+                • В связке (Mix): <b>${mixedCount}</b> (${mixedPercent}%)
+            </div>
+        `;
+    }
+
     const tmId = 'telemarketing';
     const tmWeighted = results.weighted[tmId] || 0;
     const tmUShape = results.uShape[tmId] || 0;
@@ -675,11 +672,15 @@ function renderAdvancedInsights(results, storiesLogic, offlineLogic) {
         diffText = `Ваша модель показывает схожие результаты с U-Shape.`;
     }
 
+    htmlContent += diffText;
+
     const logicText = storiesLogic ?
         `<br><br>Логика "Stories < 1h" работает: часть касаний сторис была исключена (score=0), что перераспределило вес на другие каналы.` :
         `<br><br>Логика "Stories < 1h" выключена.`;
 
-    document.getElementById('simInsightText').innerHTML = diffText + logicText;
+    htmlContent += logicText;
+
+    container.innerHTML = htmlContent;
 
     document.getElementById('insightStoriesScore').innerText = storiesLogic ? '0' : 'Current';
     document.getElementById('insightOfflineScore').innerText = offlineLogic ? '2' : 'Current';
