@@ -583,8 +583,6 @@ body {
     grid-template-columns: repeat(4, 1fr);
 }
 
-/* ... existing code ... */
-
 /* Channel Colors for Bars - VIBRANT & SOLID (Screenshot 4 Style) */
 .bg-digital {
     background-color: #3B82F6;
@@ -889,14 +887,6 @@ body {
 
 .filter-chip:hover {
     border-color: #CBD5E1;
-}
-
-/* Summary Cards */
-.sim-cards-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    margin-bottom: 24px;
 }
 
 .sim-card {

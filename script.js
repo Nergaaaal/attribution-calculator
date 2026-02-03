@@ -132,7 +132,7 @@ function renderJourney() {
                 <div class="step-name">${channel.name}</div>
                 ${logicHtml}
             </div>
-             <div class="step-score" style="font-weight:700; color:#CBD5E0; font-size:14px;">${effectiveScore}б</div>
+             <div class="step-score" style="font-weight:700; color:#CBD5E0; font-size:14px;">${effectiveScore}</div>
             <button class="delete-btn" onclick="removeFromJourney(${index})">×</button>
         `;
         stepsWrapper.appendChild(node);
@@ -409,23 +409,32 @@ function runAdvancedSimulation() {
         // Cards
         const totalSalesEl = document.getElementById('resTotalSales');
         const totalSalesSubEl = document.getElementById('resTotalSalesSub');
+        const filteredCard = document.getElementById('cardFilteredSales');
+        const cardsGrid = document.querySelector('.sim-cards-grid');
+
+        // Reset Total Sales
+        totalSalesEl.innerText = totalSimCount;
+        if (totalSalesSubEl) totalSalesSubEl.innerText = '100% конверсия';
 
         if (selectedSimFilters.length > 0) {
-            // New Requirement: Add data about sales from 1 selected channel next to Total Sales
+            // Show Filtered Card
             const primaryFilterId = selectedSimFilters[0];
             const primaryName = getChannelName(primaryFilterId);
 
-            totalSalesEl.innerHTML = `
-                ${totalSimCount} 
-                <span style="font-size:16px; color:#3B82F6; margin-left:8px; font-weight:600;">
-                     (${primaryName}: ${filteredCount})
-                </span>`;
+            if (filteredCard) {
+                filteredCard.style.display = 'block';
+                document.getElementById('resFilteredLabel').innerText = `${primaryName}`;
+                document.getElementById('resFilteredValue').innerText = filteredCount;
+                document.getElementById('resFilteredSub').innerText = `${((filteredCount / totalSimCount) * 100).toFixed(1)}% от общего`;
 
-            // totalSalesSubEl might not exist in original HTML, checking existence
-            if (totalSalesSubEl) totalSalesSubEl.innerText = `${((filteredCount / totalSimCount) * 100).toFixed(1)}% от общего`;
+                cardsGrid.classList.add('grid-4-cols');
+            }
         } else {
-            totalSalesEl.innerText = totalSimCount;
-            if (totalSalesSubEl) totalSalesSubEl.innerText = '100% конверсия';
+            // Hide Filtered Card
+            if (filteredCard) {
+                filteredCard.style.display = 'none';
+                cardsGrid.classList.remove('grid-4-cols');
+            }
         }
 
         // Top Path
