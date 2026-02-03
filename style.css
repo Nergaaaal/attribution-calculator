@@ -1041,7 +1041,7 @@ body {
     background: #60A5FA;
 }
 
-/* Table Section */
+/* 4. Table */
 .sim-table-section {
     background: white;
     padding: 32px;
@@ -1049,6 +1049,10 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     border: 1px solid #E2E8F0;
     margin-bottom: 24px;
+    max-height: 500px;
+    /* Limit height */
+    overflow-y: auto;
+    /* Enable scroll */
 }
 
 .sim-table {
