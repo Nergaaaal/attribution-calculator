@@ -179,11 +179,20 @@ function calculateWeightedScore() {
 }
 
 function calculateUShape() {
-    const ids = journey.map(j => j.id);
+    // Filter out channels that should be ignored based on logicActive flag
+    const validItems = journey.filter(item => {
+        if (item.id === 'stories' && item.logicActive) return false;
+        if (item.id === 'offline' && item.logicActive) return false;
+        return true;
+    });
+
+    const ids = validItems.map(j => j.id);
     const n = ids.length;
     if (n === 0) return {};
 
     const result = {};
+    // Initialize ALL channel keys to 0 to ensure safety, or just current ids?
+    // Better to just initialize ids present in validItems.
     ids.forEach(id => result[id] = 0);
 
     if (n === 1) {
@@ -203,14 +212,26 @@ function calculateUShape() {
 }
 
 function calculateLastTouch() {
-    if (journey.length === 0) return {};
-    const lastId = journey[journey.length - 1].id;
+    const validItems = journey.filter(item => {
+        if (item.id === 'stories' && item.logicActive) return false;
+        if (item.id === 'offline' && item.logicActive) return false;
+        return true;
+    });
+
+    if (validItems.length === 0) return {};
+    const lastId = validItems[validItems.length - 1].id;
     return { [lastId]: 100 };
 }
 
 function calculateFirstTouch() {
-    if (journey.length === 0) return {};
-    const firstId = journey[0].id;
+    const validItems = journey.filter(item => {
+        if (item.id === 'stories' && item.logicActive) return false;
+        if (item.id === 'offline' && item.logicActive) return false;
+        return true;
+    });
+
+    if (validItems.length === 0) return {};
+    const firstId = validItems[0].id;
     return { [firstId]: 100 };
 }
 
