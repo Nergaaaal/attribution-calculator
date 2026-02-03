@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Marketing Attribution Calculator</title>
-    <link rel="stylesheet" href="style.css?v=2.0">
+    <link rel="stylesheet" href="style.css?v=1.5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,9 +17,9 @@
         <div class="left-panel">
             <!-- Channel Configuration (Top) -->
             <div class="config-section">
-                <div class="section-title">
-                    <span class="icon">📋</span>
-                    <h3>ВСЕ СЦЕНАРИИ (ДЕТАЛИЗАЦИЯ)</h3>
+                <div class="section-header">
+                    <span class="icon">⚙️</span>
+                    <h2>Настройка баллов (CONFIG)</h2>
                 </div>
 
                 <div class="channels-grid" id="channelsGrid">
@@ -190,13 +190,16 @@
 
             <!-- 4. Top Scenarios Table (SWAPPED UP - User Request) -->
             <div class="sim-table-section">
-                <div class="section-title">ТОП СЦЕНАРИЕВ ПОВЕДЕНИЯ</div>
+                <div class="section-title">
+                    <span class="icon">📋</span>
+                    <h3>ВСЕ СЦЕНАРИИ (ДЕТАЛИЗАЦИЯ)</h3>
+                </div>
                 <table class="sim-table">
                     <thead>
                         <tr>
                             <th>Путь</th>
-                            <th class="text-right">КОЛ-ВО</th>
-                            <th class="text-right" style="width: 80px;">PROCENT</th>
+                            <th class="text-right" style="width: 100px;">КОЛ-ВО</th>
+                            <th class="text-right" style="width: 100px;">ПРОЦЕНТ</th>
                         </tr>
                     </thead>
                     <tbody id="simTableBody">
