@@ -244,22 +244,54 @@ body {
 
 .journey-steps {
     display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-direction: column;
+    /* Vertical stack */
     gap: 12px;
 }
 
 .journey-step {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px;
+    gap: 16px;
+    padding: 16px;
     background: white;
-    border-radius: 10px;
-    border: 2px solid var(--border-color);
-    cursor: move;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
     transition: var(--transition);
-    animation: slideIn 0.3s ease-out;
+    width: 100%;
+    /* Full width */
+    position: relative;
+}
+
+/* Border Colored Left Stripe */
+.journey-step.border-digital {
+    border-left: 5px solid #4299e1;
+}
+
+.journey-step.border-stories {
+    border-left: 5px solid #ed64a6;
+}
+
+.journey-step.border-push {
+    border-left: 5px solid #ed8936;
+}
+
+.journey-step.border-sms {
+    border-left: 5px solid #9f7aea;
+}
+
+.journey-step.border-telemarketing {
+    border-left: 5px solid #48bb78;
+}
+
+.journey-step.border-offline {
+    border-left: 5px solid #667eea;
+}
+
+.journey-step:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 @keyframes slideIn {
