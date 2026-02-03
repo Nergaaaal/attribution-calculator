@@ -515,7 +515,7 @@ function analyzePathFrequencies(dataset) {
         count: counts[key]
     })).sort((a, b) => b.count - a.count);
 
-    return sorted.slice(0, 5);
+    return sorted; // Return ALL unique paths so the sum matches the total
 }
 
 function renderComparisonBars(results, maxBase) {
