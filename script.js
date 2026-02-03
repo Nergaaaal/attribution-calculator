@@ -277,15 +277,15 @@ function renderResults(attribution, containerId) {
 
         const resultEl = document.createElement('div');
         resultEl.className = 'result-item';
-        // Flex Row: Rank | Name | Percent | Bar (Visual)
+        // Flex Row: Rank | Name | Percent | Bar
         resultEl.innerHTML = `
             <div class="result-rank">#${index + 1}</div>
-            <div class="result-info">
+            <div class="result-header">
                 <span class="result-channel-name">${channel.name}</span>
             </div>
-            <div class="result-val">${percentage.toFixed(1)}%</div>
-            <div class="result-bar-bg">
-                <div class="result-bar-fill bg-${channel.color}" style="width: ${percentage}%"></div>
+            <div class="result-percent">${percentage.toFixed(1)}%</div>
+            <div class="result-bar-container">
+                <div class="result-bar bg-${channel.color}" style="width: ${percentage}%"></div>
             </div>
         `;
         container.appendChild(resultEl);
