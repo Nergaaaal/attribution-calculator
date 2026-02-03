@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing Attribution Calculator</title>
+    <link rel="stylesheet" href="style.css?v=3.1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Left Panel -->
+        <div class="left-panel">
+            <!-- Channel Configuration (Top) -->
+            <div class="config-section">
+                <div class="section-header">
+                    <span class="icon">⚙️</span>
+                    <h2>Настройка баллов (CONFIG)</h2>
+                </div>
+
+                <div class="channels-grid" id="channelsGrid">
+                    <!-- Channels will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- Customer Journey (Bottom) -->
+            <div class="journey-section">
+                <div class="section-header">
+                    <span class="icon">📈</span>
+                    <h2>Путь клиента</h2>
+                    <button class="clear-btn" id="clearJourney">Очистить</button>
+                </div>
+
+                <div class="journey-path" id="journeyPath">
+                    <div class="empty-state">
+                        <p>Выберите каналы из списка выше, чтобы построить путь клиента</p>
+                    </div>
+                </div>
+
+                <div class="total-score">
+                    <span>Effective Total Score:</span>
+                    <span class="score-value" id="totalScore">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Attribution Results -->
+        <div class="right-panel">
+            <div class="results-header">
+                <span class="icon">📊</span>
+                <h1>Результаты Атрибуции</h1>
+            </div>
+
+            <!-- Weighted Score Model -->
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">📊</span>
+                    <div>
+                        <h3>Ваша модель (Weighted Score)</h3>
+                        <p class="model-subtitle">Доля = Балл канала / Сумма баллов</p>
+                    </div>
+                </div>
+
+                <div class="results-list" id="weightedResults">
+                    <!-- Results will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- U-Shape Model -->
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">🏔️</span>
+                    <div>
+                        <h3>U-Shape (Position Based)</h3>
+                        <p class="model-subtitle">40% Первому / 40% Последнему / 20% Середине</p>
+                    </div>
+                </div>
+
+                <div class="results-list" id="ushapeResults">
+                    <!-- Results will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- Last Touch Model -->
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">👆</span>
+                    <div>
+                        <h3>Last Touch</h3>
+                        <p class="model-subtitle">100% последнему каналу</p>
+                    </div>
+                </div>
+
+                <div class="results-list" id="lastTouchResults">
+                    <!-- Results will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- First Touch Model -->
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">🎯</span>
+                    <div>
+                        <h3>First Touch</h3>
+                        <p class="model-subtitle">100% первому каналу</p>
+                    </div>
+                </div>
+
+                <div class="results-list" id="firstTouchResults">
+                    <!-- Results will be dynamically generated -->
+                </div>
+            </div>
+
+            <!-- Attribution Insights -->
+            <div class="attribution-insights" id="attributionInsights">
+                <!-- Insights will be dynamically generated -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Simulation Dashboard Section -->
+    <div class="simulation-section">
+
+        <!-- 1. Controls Panel -->
+        <div class="sim-controls-panel">
+            <div class="sim-input-group">
+                <label>КОЛИЧЕСТВО ПРОДАЖ</label>
+                <div class="input-wrapper">
+                    <input type="number" id="simCount" value="8000" min="100" max="50000" step="100">
+                    <span class="unit">шт.</span>
+                </div>
+            </div>
+
+            <!-- New Channel Filter Section -->
+            <div class="sim-filter-group">
+                <label>ФИЛЬТР ПО КАНАЛАМ (КОМБИНАЦИИ)</label>
+                <div class="channel-toggles" id="simChannelToggles">
+                    <!-- Checkboxes generated by JS -->
+                </div>
+            </div>
+
+            <div class="sim-checkboxes">
+                <label class="checkbox-container">
+                    <input type="checkbox" id="simCheckStories" checked>
+                    <span class="checkmark"></span>
+                    Применять логику "Stories < 1h" </label>
+                        <label class="checkbox-container">
+                            <input type="checkbox" id="simCheckOffline" checked>
+                            <span class="checkmark"></span>
+                            Применять логику "Отказ в App"
+                        </label>
+            </div>
+
+            <button id="runSimulationBtn" class="sim-run-btn">
+                Смоделировать <span class="arrow">▶</span>
+            </button>
+        </div>
+
+        <!-- Simulation Results Container (Hidden by default) -->
+        <div id="simulationResults" class="hidden">
+
+            <!-- 2. Summary Cards -->
+            <div class="sim-cards-grid">
+                <div class="sim-card">
+                    <div class="card-label">ВСЕГО ПРОДАЖ</div>
+                    <div class="card-value" id="resTotalSales">8000</div>
+                    <div class="card-sub text-green" id="resTotalSalesSub">100% конверсия</div>
+                </div>
+
+                <!-- ADDED: Filtered Sales Card (Dynamic) -->
+                <div class="sim-card hidden" id="simFilteredCard">
+                    <!-- Populated by JS when filter active -->
+                </div>
+
+                <div class="sim-card">
+                    <div class="card-label">САМЫЙ ЧАСТЫЙ ПУТЬ</div>
+                    <div class="card-value sm" id="resTopPath">Push → Stories → Offline</div>
+                    <div class="card-sub text-gray" id="resTopPathPercent">18.3% от всех продаж</div>
+                </div>
+                <div class="sim-card">
+                    <div class="card-label">РАЗНИЦА МОДЕЛЕЙ (DIGITAL)</div>
+                    <div class="card-value" id="resDigitalDiff">+172.3%</div>
+                    <div class="card-sub text-gray">U-Shape vs Weighted</div>
+                </div>
+            </div>
+
+            <!-- 4. Top Scenarios Table (SWAPPED UP - User Request) -->
+            <div class="sim-table-section">
+                <div class="section-title">
+                    <span class="icon">📋</span>
+                    <h3>ВСЕ СЦЕНАРИИ (ДЕТАЛИЗАЦИЯ)</h3>
+                </div>
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Путь</th>
+                            <th class="col-number">КОЛ-ВО</th>
+                            <th class="col-number">ПРОЦЕНТ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="simTableBody">
+                        <!-- Dynamic Rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 3. Distribution Bars (SWAPPED DOWN) -->
+            <div class="sim-chart-section">
+                <div class="section-title">
+                    <span class="icon-bar">📊</span> Распределение вклада (Атрибуция продаж)
+                </div>
+
+                <div id="simBarsContainer" class="sim-bars-container">
+                    <!-- Dynamic Bars Generated via JS -->
+                </div>
+
+                <div class="sim-legend">
+                    <div class="legend-item"><span class="dot l-gray"></span> Last Touch</div>
+                    <div class="legend-item"><span class="dot l-green"></span> Ваша модель (Баллы)</div>
+                    <div class="legend-item"><span class="dot l-blue"></span> U-Shape (Market Standard)</div>
+                </div>
+            </div>
+
+            <!-- 5. Analytical Insight -->
+            <div class="sim-insight-section">
+                <div class="insight-icon">💡</div>
+                <div class="insight-content">
+                    <h3>Аналитический вывод</h3>
+                    <div id="simInsightText">
+                        Ваша модель присваивает Телемаркетингу на 52% больше продаж...
+                    </div>
+                    <div class="insight-code">
+                        Настройки:<br>
+                        Stories Score = <span id="insightStoriesScore">0</span> (если < 1h)<br>
+                            Offline Score = <span id="insightOfflineScore">0.5</span> (если отказ в App) - Weighted
+                            Reduced
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js?v=3.1" defer></script>
+</body>
+
+</html>
