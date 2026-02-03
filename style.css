@@ -570,52 +570,33 @@ body {
     min-width: 40px;
 }
 
-/* 2. Summary Cards */
-.sim-cards-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    margin-bottom: 24px;
-    transition: all 0.3s ease;
-}
-
-.sim-cards-grid.grid-4-cols {
-    grid-template-columns: repeat(4, 1fr);
-}
-
-/* Channel Colors for Bars - VIBRANT & SOLID (Screenshot 4 Style) */
+/* Channel Colors for Bars */
 .bg-digital {
-    background-color: #3B82F6;
+    background-color: #4299e1;
 }
 
-/* Blue */
 .bg-stories {
-    background-color: #EC4899;
+    background-color: #ed64a6;
 }
 
-/* Pink */
 .bg-push {
-    background-color: #F97316;
+    background-color: #ed8936;
 }
 
-/* Orange */
 .bg-sms {
-    background-color: #8B5CF6;
+    background-color: #9f7aea;
 }
 
-/* Purple */
 .bg-telemarketing {
-    background-color: #10B981;
+    background-color: #48bb78;
 }
 
-/* Green */
 .bg-offline {
-    background-color: #6366F1;
+    background-color: #667eea;
 }
 
-/* Indigo */
 .bg-gray {
-    background-color: #94A3B8;
+    background-color: #CBD5E0;
 }
 
 .hidden {
@@ -889,12 +870,26 @@ body {
     border-color: #CBD5E1;
 }
 
+/* 2. Summary Cards */
+.sim-cards-grid {
+    display: grid;
+    /* Grid adapts to number of cards (3 or 4) */
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
 .sim-card {
     background: white;
     padding: 24px;
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     border: 1px solid #E2E8F0;
+    transition: var(--transition);
+}
+
+.sim-card.hidden {
+    display: none;
 }
 
 .sim-card .card-label {

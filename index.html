@@ -167,15 +167,13 @@
             <div class="sim-cards-grid">
                 <div class="sim-card">
                     <div class="card-label">ВСЕГО ПРОДАЖ</div>
-                    <div class="card-value" id="resTotalSales">800</div>
+                    <div class="card-value" id="resTotalSales">8000</div>
                     <div class="card-sub text-green" id="resTotalSalesSub">100% конверсия</div>
                 </div>
 
-                <!-- NEW: Filtered Sales Card (Hidden by default) -->
-                <div class="sim-card" id="cardFilteredSales" style="display: none; border: 2px solid #3B82F6;">
-                    <div class="card-label" style="color:#3B82F6" id="resFilteredLabel">DIGITAL ADS</div>
-                    <div class="card-value" style="color:#2563EB" id="resFilteredValue">3626</div>
-                    <div class="card-sub text-gray" id="resFilteredSub">45.3% от общего</div>
+                <!-- ADDED: Filtered Sales Card (Dynamic) -->
+                <div class="sim-card hidden" id="simFilteredCard">
+                    <!-- Populated by JS when filter active -->
                 </div>
 
                 <div class="sim-card">
