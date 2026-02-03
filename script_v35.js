@@ -179,10 +179,10 @@ function calculateWeightedScore() {
 }
 
 function calculateUShape() {
-    // Filter out channels that should be ignored based on logicActive flag
+    // Only filter out Stories when its logic is active
+    // Offline logic affects score, not position
     const validItems = journey.filter(item => {
         if (item.id === 'stories' && item.logicActive) return false;
-        if (item.id === 'offline' && item.logicActive) return false;
         return true;
     });
 
@@ -191,8 +191,6 @@ function calculateUShape() {
     if (n === 0) return {};
 
     const result = {};
-    // Initialize ALL channel keys to 0 to ensure safety, or just current ids?
-    // Better to just initialize ids present in validItems.
     ids.forEach(id => result[id] = 0);
 
     if (n === 1) {
@@ -214,7 +212,6 @@ function calculateUShape() {
 function calculateLastTouch() {
     const validItems = journey.filter(item => {
         if (item.id === 'stories' && item.logicActive) return false;
-        if (item.id === 'offline' && item.logicActive) return false;
         return true;
     });
 
@@ -226,7 +223,6 @@ function calculateLastTouch() {
 function calculateFirstTouch() {
     const validItems = journey.filter(item => {
         if (item.id === 'stories' && item.logicActive) return false;
-        if (item.id === 'offline' && item.logicActive) return false;
         return true;
     });
 
@@ -315,10 +311,45 @@ function renderResults(attribution, containerId) {
 }
 
 function renderAttributionInsights(results) {
-    // ... Simplified implementation for brevity, logic exists in previous versions ...
     const container = document.getElementById('attributionInsights');
     if (!container) return;
-    container.innerHTML = ''; // Placeholder for now or restore full logic
+
+    if (!results.weightedScore || !results.uShape) {
+        container.innerHTML = '';
+        return;
+    }
+
+    // Check if any logic is active
+    const storiesActive = journey.some(item => item.id === 'stories' && item.logicActive);
+    const offlineActive = journey.some(item => item.id === 'offline' && item.logicActive);
+
+    // Analyze difference for Telemarketing
+    const tm = 'telemarketing';
+    const wTM = results.weightedScore[tm] || 0;
+    const uTM = results.uShape[tm] || 0;
+
+    let text = "<div style='padding: 16px; background: #FFFBEB; border-radius: 12px; color: #92400E; font-size: 14px; line-height: 1.6;'>";
+    text += "<strong>💡 Анализ:</strong> ";
+
+    if (wTM > uTM * 1.15) {
+        const diff = ((wTM - uTM) / (uTM || 1) * 100).toFixed(0);
+        text += `Ваша модель начисляет Телемаркетингу на ${diff}% больше продаж, чем U-Shape, благодаря высокому баллу (5).`;
+    } else if (uTM > wTM * 1.15) {
+        text += `U-Shape начисляет Телемаркетингу больше, чем ваша модель.`;
+    } else {
+        text += `Модели показывают схожие результаты для основных каналов.`;
+    }
+
+    if (storiesActive) {
+        text += "<br><strong>Stories</strong> исключены из атрибуции (их вклад = 0%).";
+    }
+
+    if (offlineActive) {
+        text += "<br><strong>Offline</strong> оценивается как отказ (пониженный балл).";
+    }
+
+    text += "</div>";
+    container.innerHTML = text;
 }
 
 
@@ -500,15 +531,9 @@ function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
         // Interpretation: If Stories logic is ON, treat it as if it didn't exist in the chain for position-based models.
 
         let filteredPath = path.filter(id => {
+            // Only Stories is excluded from U-Shape when logic is active
+            // Offline logic only affects score, not position
             if (useStoriesLogic && id === 'stories') return false;
-            // NOTE: Offline is usually a "Endpoint" or valid touch, just low score.
-            // But if user wants "Logic Applied" -> maybe exclude? 
-            // The prompt said "Stories < 1h logic ignored in U-Shape".
-            // Let's exclude Stories. Only exclude Offline if it's considered "Bounce" (logic says 'Refusal').
-            // If refusal, it contributes nothing? Or just low score?
-            // "Refusal in App" -> likely shouldn't get attribution if it's a refusal. 
-            // Let's exclude it from path for U-Shape too if logic checked.
-            if (useOfflineLogic && id === 'offline') return false;
             return true;
         });
 
