@@ -557,11 +557,11 @@ body {
 .result-bar-container {
     flex: 1;
     /* Take remaining space */
-    height: 8px;
+    height: 14px;
     /* Slimmer, modern bar */
     background-color: #EDF2F7;
     /* Lighter track */
-    border-radius: 4px;
+    border-radius: 7px;
     /* Fully rounded */
     overflow: hidden;
     position: relative;
@@ -571,9 +571,32 @@ body {
 
 .result-bar {
     height: 100%;
-    border-radius: 4px;
+    border-radius: 7px;
     transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     /* No text inside, purely visual */
+}
+
+/* Empty State Styling */
+.empty-results-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: #A0AEC0;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    background: #F7FAFC;
+    border-radius: 12px;
+    border: 1px dashed #E2E8F0;
+    margin-top: 12px;
+}
+
+.empty-results-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+    opacity: 0.5;
 }
 
 /* Channel Colors for Bars */
