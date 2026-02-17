@@ -1,14 +1,16 @@
 // ============================================
 // Upload Page — CSV/Excel Attribution Analysis
-// v3.0 — 3-column mapping (ID, Channel, Date)
+// v4.0 — channel scores, date sorting, fixed models
 // ============================================
 
 let uploadedData = [];
 let fileHeaders = [];
 let channelColumns = [];
 let clientIdColumn = 0;
+let dateColumn = -1;
 let journeys = [];
 let currentWorkbook = null;
+let channelScores = {}; // { channelName: score }
 
 const DEFAULT_SCORE = 3;
 const CHANNEL_COLORS = [
@@ -23,15 +25,12 @@ function init() {
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('fileInput');
 
-    // Click to upload
     dropzone.addEventListener('click', () => fileInput.click());
 
-    // File selected
     fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) handleFile(e.target.files[0]);
     });
 
-    // Drag & Drop
     dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropzone.classList.add('dragover');
@@ -47,13 +46,8 @@ function init() {
         if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
     });
 
-    // Clear file
     document.getElementById('clearFileBtn').addEventListener('click', clearFile);
-
-    // Run analysis
     document.getElementById('runAnalysisBtn').addEventListener('click', runAnalysis);
-
-    // Sheet selector
     document.getElementById('sheetSelect').addEventListener('change', onSheetChange);
 }
 
@@ -67,7 +61,6 @@ function handleFile(file) {
         return;
     }
 
-    // Show file info, hide dropzone
     document.getElementById('uploadInfo').style.display = 'block';
     document.getElementById('dropzone').classList.add('hidden-zone');
     document.getElementById('fileName').textContent = file.name;
@@ -118,7 +111,6 @@ function parseCSV(text) {
 function parseExcel(buffer) {
     currentWorkbook = XLSX.read(buffer, { type: 'array' });
 
-    // Show sheet selector
     const sheetSelect = document.getElementById('sheetSelect');
     sheetSelect.innerHTML = currentWorkbook.SheetNames.map((name, i) =>
         `<option value="${i}" ${i === 0 ? 'selected' : ''}>${name}</option>`
@@ -130,7 +122,6 @@ function parseExcel(buffer) {
         document.getElementById('sheetSelector').style.display = 'none';
     }
 
-    // Load first sheet
     loadSheet(0);
 }
 
@@ -170,6 +161,7 @@ function clearFile() {
     channelColumns = [];
     journeys = [];
     currentWorkbook = null;
+    channelScores = {};
 
     document.getElementById('uploadInfo').style.display = 'none';
     document.getElementById('dropzone').classList.remove('hidden-zone');
@@ -177,6 +169,7 @@ function clearFile() {
     document.getElementById('columnMapping').style.display = 'none';
     document.getElementById('resultsSection').style.display = 'none';
     document.getElementById('sheetSelector').style.display = 'none';
+    document.getElementById('channelScoresSection').style.display = 'none';
     document.getElementById('fileInput').value = '';
 }
 
@@ -208,19 +201,48 @@ function renderColumnMapping() {
     document.getElementById('colChannel').innerHTML = optionsHtml;
     document.getElementById('colDate').innerHTML = optionsHtml;
 
-    // Try to auto-detect columns
     fileHeaders.forEach((h, i) => {
         const lower = h.toLowerCase();
-        if (lower.includes('id') || lower.includes('клиент') || lower.includes('client')) {
+        if (lower.includes('id') || lower.includes('клиент') || lower.includes('client') || lower.includes('_cd')) {
             document.getElementById('colClientId').value = i;
         }
-        if (lower.includes('канал') || lower.includes('channel') || lower.includes('отделение') || lower.includes('source') || lower.includes('medium')) {
+        if (lower.includes('канал') || lower.includes('channel') || lower.includes('отделение') || lower.includes('source') || lower.includes('medium') || lower.includes('event_type') || lower.includes('тип')) {
             document.getElementById('colChannel').value = i;
         }
         if (lower.includes('дата') || lower.includes('date') || lower.includes('время') || lower.includes('time') || lower.includes('регистрац')) {
             document.getElementById('colDate').value = i;
         }
     });
+}
+
+// ---- CHANNEL SCORES UI ----
+
+function renderChannelScores(allChannels) {
+    const grid = document.getElementById('channelScoresGrid');
+    grid.innerHTML = '';
+
+    allChannels.forEach(ch => {
+        // Keep existing score or default to 3
+        if (channelScores[ch] === undefined) {
+            channelScores[ch] = DEFAULT_SCORE;
+        }
+
+        const item = document.createElement('div');
+        item.className = 'score-item';
+        item.innerHTML = `
+            <span class="score-item-name">${ch}</span>
+            <input type="number" value="${channelScores[ch]}" min="0.1" max="10" step="0.1"
+                   data-channel="${ch}" onchange="updateScore(this)">
+        `;
+        grid.appendChild(item);
+    });
+
+    document.getElementById('channelScoresSection').style.display = 'block';
+}
+
+function updateScore(input) {
+    const ch = input.dataset.channel;
+    channelScores[ch] = parseFloat(input.value) || DEFAULT_SCORE;
 }
 
 // ---- ANALYSIS ----
@@ -234,6 +256,7 @@ function runAnalysis() {
         try {
             const clientIdVal = document.getElementById('colClientId').value;
             const channelVal = document.getElementById('colChannel').value;
+            const dateVal = document.getElementById('colDate').value;
 
             if (!clientIdVal && clientIdVal !== '0') {
                 alert('Выберите столбец с ID клиента.');
@@ -246,6 +269,7 @@ function runAnalysis() {
 
             clientIdColumn = parseInt(clientIdVal);
             channelColumns = [parseInt(channelVal)];
+            dateColumn = (dateVal !== '' && dateVal !== undefined) ? parseInt(dateVal) : -1;
 
             buildJourneys();
 
@@ -255,6 +279,10 @@ function runAnalysis() {
             }
 
             const allChannels = getUniqueChannels();
+
+            // Show score inputs
+            renderChannelScores(allChannels);
+
             const results = calculateAllModels(allChannels);
             const topPaths = analyzePathFrequencies();
 
@@ -280,25 +308,49 @@ function runAnalysis() {
 function buildJourneys() {
     journeys = [];
 
-    // Group rows by client ID and build journey paths
+    // Collect all rows per client with their date (if available)
     const clientMap = {};
 
-    uploadedData.forEach(row => {
+    uploadedData.forEach((row, rowIndex) => {
         const clientId = String(row[clientIdColumn] || '').trim();
         if (!clientId) return;
 
         const channelValue = String(row[channelColumns[0]] || '').trim();
-        if (!channelValue || channelValue === '0' || channelValue === '-' || channelValue.toLowerCase() === 'null' || channelValue.toLowerCase() === 'nan') return;
+        if (!channelValue || channelValue === '0' || channelValue === '-' ||
+            channelValue.toLowerCase() === 'null' || channelValue.toLowerCase() === 'nan') return;
+
+        let dateValue = null;
+        if (dateColumn >= 0) {
+            dateValue = row[dateColumn];
+        }
 
         if (!clientMap[clientId]) {
             clientMap[clientId] = [];
         }
-        clientMap[clientId].push(channelValue);
+        clientMap[clientId].push({
+            channel: channelValue,
+            date: dateValue,
+            rowOrder: rowIndex
+        });
     });
 
-    // Convert to journeys
+    // Sort each client's touches by date (chronological), then by row order
     Object.keys(clientMap).forEach(clientId => {
-        const path = clientMap[clientId];
+        const touches = clientMap[clientId];
+
+        // Sort by date if available
+        touches.sort((a, b) => {
+            if (a.date != null && b.date != null) {
+                const da = new Date(a.date);
+                const db = new Date(b.date);
+                if (!isNaN(da) && !isNaN(db)) {
+                    return da - db;
+                }
+            }
+            return a.rowOrder - b.rowOrder;
+        });
+
+        const path = touches.map(t => t.channel);
         if (path.length > 0) {
             journeys.push({ clientId, path });
         }
@@ -331,21 +383,27 @@ function calculateAllModels(allChannels) {
         const n = path.length;
         if (n === 0) return;
 
-        // Weighted
-        const totalScore = n * DEFAULT_SCORE;
+        // ---- Weighted Score (using channel scores) ----
+        let totalScore = 0;
+        const scores = path.map(ch => {
+            const s = channelScores[ch] !== undefined ? channelScores[ch] : DEFAULT_SCORE;
+            totalScore += s;
+            return s;
+        });
+
         if (totalScore > 0) {
-            path.forEach(ch => {
-                weighted[ch] = (weighted[ch] || 0) + (DEFAULT_SCORE / totalScore);
+            path.forEach((ch, idx) => {
+                weighted[ch] = (weighted[ch] || 0) + (scores[idx] / totalScore);
             });
         }
 
-        // Last Touch
+        // ---- Last Touch: 100% to last channel ----
         lastTouch[path[n - 1]] = (lastTouch[path[n - 1]] || 0) + 1;
 
-        // First Touch
+        // ---- First Touch: 100% to first channel ----
         firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
 
-        // U-Shape
+        // ---- U-Shape: 40% first, 40% last, 20% split middle ----
         if (n === 1) {
             uShape[path[0]] = (uShape[path[0]] || 0) + 1;
         } else if (n === 2) {
@@ -461,9 +519,6 @@ function renderAllModelResults(results, allChannels) {
     renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels);
 }
 
-function toggleModelExpand(btn) { }
-
-
 function renderComparisonBars(results, allChannels) {
     const container = document.getElementById('uploadBarsContainer');
     container.innerHTML = '';
@@ -503,7 +558,6 @@ function renderComparisonBars(results, allChannels) {
 
 function renderScenariosTable(topPaths) {
     const tbody = document.getElementById('uploadTableBody');
-    const expandBtn = document.getElementById('expandTableBtn');
     tbody.innerHTML = '';
 
     const totalCount = journeys.length || 1;
@@ -524,9 +578,6 @@ function renderScenariosTable(topPaths) {
         tbody.appendChild(tr);
     });
 }
-
-function toggleTableExpand() { }
-
 
 function renderInsight(results, allChannels) {
     const container = document.getElementById('uploadInsightText');

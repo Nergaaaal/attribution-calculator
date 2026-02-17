@@ -314,6 +314,77 @@
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+/* ---- CHANNEL SCORES ---- */
+.channel-scores-section {
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+}
+
+.scores-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.scores-header h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+    margin: 0;
+}
+
+.scores-hint {
+    font-size: 11px;
+    color: #94A3B8;
+    margin-left: auto;
+}
+
+.scores-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.score-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 6px 12px;
+}
+
+.score-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.score-item input[type="number"] {
+    width: 52px;
+    padding: 4px 6px;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    color: #667eea;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.score-item input[type="number"]:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
 /* GREEN gradient button */
 .run-analysis-btn {
     width: 100%;
