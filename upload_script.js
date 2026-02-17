@@ -404,19 +404,18 @@ function calculateAllModels(allChannels) {
         // ---- First Touch: 100% to first channel ----
         firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
 
-        // ---- U-Shape: only for 2+ touchpoints ----
-        // Single-touch journeys are excluded — U-Shape is position-based
-        if (n >= 2) {
-            if (n === 2) {
-                uShape[path[0]] = (uShape[path[0]] || 0) + 0.5;
-                uShape[path[1]] = (uShape[path[1]] || 0) + 0.5;
-            } else {
-                uShape[path[0]] = (uShape[path[0]] || 0) + 0.4;
-                uShape[path[n - 1]] = (uShape[path[n - 1]] || 0) + 0.4;
-                const mid = 0.2 / (n - 2);
-                for (let k = 1; k < n - 1; k++) {
-                    uShape[path[k]] = (uShape[path[k]] || 0) + mid;
-                }
+        // ---- U-Shape: 40% first, 40% last, 20% split middle ----
+        if (n === 1) {
+            uShape[path[0]] = (uShape[path[0]] || 0) + 1;
+        } else if (n === 2) {
+            uShape[path[0]] = (uShape[path[0]] || 0) + 0.5;
+            uShape[path[1]] = (uShape[path[1]] || 0) + 0.5;
+        } else {
+            uShape[path[0]] = (uShape[path[0]] || 0) + 0.4;
+            uShape[path[n - 1]] = (uShape[path[n - 1]] || 0) + 0.4;
+            const mid = 0.2 / (n - 2);
+            for (let k = 1; k < n - 1; k++) {
+                uShape[path[k]] = (uShape[path[k]] || 0) + mid;
             }
         }
     });
@@ -440,8 +439,7 @@ function calculateAllModels(allChannels) {
         rawWeighted: weighted,
         rawUShape: uShape,
         rawLastTouch: lastTouch,
-        rawFirstTouch: firstTouch,
-        uShapePositional: calculateUShapePositional(allChannels)
+        rawFirstTouch: firstTouch
     };
 }
 
@@ -455,49 +453,6 @@ function analyzePathFrequencies() {
     return Object.keys(counts)
         .map(key => ({ path: key, count: counts[key] }))
         .sort((a, b) => b.count - a.count);
-}
-
-function calculateUShapePositional(allChannels) {
-    const firstPos = {};
-    const middlePos = {};
-    const lastPos = {};
-    let multiTouchCount = 0;
-
-    allChannels.forEach(ch => {
-        firstPos[ch] = 0;
-        middlePos[ch] = 0;
-        lastPos[ch] = 0;
-    });
-
-    journeys.forEach(j => {
-        const path = j.path;
-        const n = path.length;
-        if (n < 2) return;
-
-        multiTouchCount++;
-        firstPos[path[0]] = (firstPos[path[0]] || 0) + 1;
-        lastPos[path[n - 1]] = (lastPos[path[n - 1]] || 0) + 1;
-
-        for (let k = 1; k < n - 1; k++) {
-            middlePos[path[k]] = (middlePos[path[k]] || 0) + 1;
-        }
-    });
-
-    const toPercent = (obj) => {
-        const total = Object.values(obj).reduce((a, b) => a + b, 0);
-        const result = {};
-        Object.keys(obj).forEach(k => {
-            result[k] = total > 0 ? (obj[k] / total) * 100 : 0;
-        });
-        return result;
-    };
-
-    return {
-        first: toPercent(firstPos),
-        middle: toPercent(middlePos),
-        last: toPercent(lastPos),
-        multiTouchCount
-    };
 }
 
 // ---- RENDERING ----
@@ -559,69 +514,9 @@ function renderModelResults(attribution, containerId, allChannels) {
 
 function renderAllModelResults(results, allChannels) {
     renderModelResults(results.weighted, 'uploadWeightedResults', allChannels);
-    renderUShapePositional(results.uShapePositional, 'uploadUShapeResults', allChannels);
+    renderModelResults(results.uShape, 'uploadUShapeResults', allChannels);
     renderModelResults(results.lastTouch, 'uploadLastTouchResults', allChannels);
     renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels);
-}
-
-function renderUShapePositional(positional, containerId, allChannels) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    if (positional.multiTouchCount === 0) {
-        container.innerHTML = '<div class="sim-empty-state"><div class="empty-icon">📊</div><div class="empty-text">Нет клиентов с 2+ касаниями</div></div>';
-        return;
-    }
-
-    container.innerHTML = '';
-
-    const sections = [
-        { label: '🥇 Первый контакт', weight: '40%', data: positional.first },
-        { label: '🔄 Средние контакты', weight: '20%', data: positional.middle },
-        { label: '🏁 Последний контакт', weight: '40%', data: positional.last }
-    ];
-
-    sections.forEach(section => {
-        const sectionEl = document.createElement('div');
-        sectionEl.className = 'ushape-position-section';
-
-        const headerEl = document.createElement('div');
-        headerEl.className = 'ushape-position-header';
-        headerEl.innerHTML = `<span>${section.label}</span><span class="ushape-weight">${section.weight}</span>`;
-        sectionEl.appendChild(headerEl);
-
-        const sortedChannels = Object.keys(section.data)
-            .filter(ch => section.data[ch] > 0)
-            .sort((a, b) => section.data[b] - section.data[a]);
-
-        if (sortedChannels.length === 0) {
-            const emptyEl = document.createElement('div');
-            emptyEl.className = 'ushape-empty';
-            emptyEl.textContent = 'Нет данных';
-            sectionEl.appendChild(emptyEl);
-        } else {
-            sortedChannels.forEach((ch, index) => {
-                const pct = section.data[ch];
-                const colorIdx = allChannels.indexOf(ch);
-                const color = getChannelColor(colorIdx);
-
-                const el = document.createElement('div');
-                el.className = 'result-item';
-                el.innerHTML = `
-                    <div class="result-header">
-                        <span class="result-channel-name">${ch}</span>
-                    </div>
-                    <div class="result-percent">${pct.toFixed(1)}%</div>
-                    <div class="result-bar-container">
-                        <div class="result-bar" style="width: ${pct}%; background-color: ${color};"></div>
-                    </div>
-                `;
-                sectionEl.appendChild(el);
-            });
-        }
-
-        container.appendChild(sectionEl);
-    });
 }
 
 function renderComparisonBars(results, allChannels) {
