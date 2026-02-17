@@ -403,18 +403,19 @@ function calculateAllModels(allChannels) {
         // ---- First Touch: 100% to first channel ----
         firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
 
-        // ---- U-Shape: 40% first, 40% last, 20% split middle ----
-        if (n === 1) {
-            uShape[path[0]] = (uShape[path[0]] || 0) + 1;
-        } else if (n === 2) {
-            uShape[path[0]] = (uShape[path[0]] || 0) + 0.5;
-            uShape[path[1]] = (uShape[path[1]] || 0) + 0.5;
-        } else {
-            uShape[path[0]] = (uShape[path[0]] || 0) + 0.4;
-            uShape[path[n - 1]] = (uShape[path[n - 1]] || 0) + 0.4;
-            const mid = 0.2 / (n - 2);
-            for (let k = 1; k < n - 1; k++) {
-                uShape[path[k]] = (uShape[path[k]] || 0) + mid;
+        // ---- U-Shape: only for 2+ touchpoints ----
+        // Single-touch journeys are excluded — U-Shape is position-based
+        if (n >= 2) {
+            if (n === 2) {
+                uShape[path[0]] = (uShape[path[0]] || 0) + 0.5;
+                uShape[path[1]] = (uShape[path[1]] || 0) + 0.5;
+            } else {
+                uShape[path[0]] = (uShape[path[0]] || 0) + 0.4;
+                uShape[path[n - 1]] = (uShape[path[n - 1]] || 0) + 0.4;
+                const mid = 0.2 / (n - 2);
+                for (let k = 1; k < n - 1; k++) {
+                    uShape[path[k]] = (uShape[path[k]] || 0) + mid;
+                }
             }
         }
     });
@@ -490,8 +491,7 @@ function renderModelResults(attribution, containerId, allChannels) {
     container.innerHTML = '';
 
     sortedKeys.forEach((ch, index) => {
-        const pct = attribution[ch];
-        if (pct <= 0) return;
+        const pct = attribution[ch] || 0;
 
         const colorIdx = allChannels.indexOf(ch);
         const color = getChannelColor(colorIdx);
