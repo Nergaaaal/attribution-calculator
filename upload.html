@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Загрузка данных — Attribution Calculator</title>
-    <link rel="stylesheet" href="style_v35.css?v=5.0">
-    <link rel="stylesheet" href="upload_style.css?v=2.0">
+    <link rel="stylesheet" href="style_v35.css?v=6.0">
+    <link rel="stylesheet" href="upload_style.css?v=3.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -25,7 +25,7 @@
         </div>
     </nav>
 
-    <!-- Main Content Card -->
+    <!-- Main Content -->
     <div class="upload-page-wrapper">
         <div class="upload-main-card">
             <!-- Header -->
@@ -37,19 +37,7 @@
                 </div>
             </div>
 
-            <div class="header-divider"></div>
-
-            <!-- Drop Zone -->
-            <div class="upload-dropzone" id="dropzone">
-                <div class="dropzone-content">
-                    <div class="dropzone-icon">📄</div>
-                    <h2>Перетащите файл сюда или <span class="dropzone-link">выберите файл</span></h2>
-                    <p>Поддерживаются .xlsx, .xls, .csv</p>
-                </div>
-                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
-            </div>
-
-            <!-- File Info -->
+            <!-- File Info (shown after file selected) -->
             <div class="upload-info" id="uploadInfo" style="display:none;">
                 <div class="file-info">
                     <span class="file-icon">✅</span>
@@ -61,25 +49,48 @@
                 </div>
             </div>
 
-            <!-- Sheet Selector (for Excel) -->
+            <!-- Sheet Selector (for Excel with multiple sheets) -->
             <div class="sheet-selector" id="sheetSelector" style="display:none;">
                 <label>Выберите лист:</label>
                 <select id="sheetSelect" class="mapping-select"></select>
             </div>
 
+            <!-- Drop Zone (hidden after file selected) -->
+            <div class="upload-dropzone" id="dropzone">
+                <div class="dropzone-content">
+                    <div class="dropzone-icon">📄</div>
+                    <h2>Перетащите файл сюда или <span class="dropzone-link">выберите файл</span></h2>
+                    <p>Поддерживаются .xlsx, .xls, .csv</p>
+                </div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
+            </div>
+
             <!-- Column Mapping -->
             <div class="column-mapping" id="columnMapping" style="display:none;">
-                <h3>⚙️ Настройка столбцов</h3>
-                <p class="mapping-hint">Выберите столбцы, которые содержат данные о каналах и клиентах</p>
+                <div class="mapping-section-header">
+                    <span class="mapping-icon">⚙️</span>
+                    <h3>МАППИНГ КОЛОНОК</h3>
+                </div>
+                <p class="mapping-hint">Укажите, какие колонки в вашем файле соответствуют нужным полям</p>
 
-                <div class="mapping-grid">
+                <div class="mapping-grid-3col">
                     <div class="mapping-item">
-                        <label>Столбец с ID клиента</label>
-                        <select id="colClientId" class="mapping-select"></select>
+                        <label><span class="field-icon">🆔</span> ID Клиента</label>
+                        <select id="colClientId" class="mapping-select">
+                            <option value="">— Выберите —</option>
+                        </select>
                     </div>
                     <div class="mapping-item">
-                        <label>Столбцы с каналами (touchpoints)</label>
-                        <div class="channel-cols-list" id="channelColsList"></div>
+                        <label><span class="field-icon">📡</span> Канал коммуникации</label>
+                        <select id="colChannel" class="mapping-select">
+                            <option value="">— Выберите —</option>
+                        </select>
+                    </div>
+                    <div class="mapping-item">
+                        <label><span class="field-icon">⏰</span> Дата / Время</label>
+                        <select id="colDate" class="mapping-select">
+                            <option value="">— Выберите —</option>
+                        </select>
                     </div>
                 </div>
 
@@ -92,8 +103,8 @@
         <!-- Data Preview Card -->
         <div class="preview-card" id="previewCard" style="display:none;">
             <div class="preview-header">
-                <span class="icon">👀</span>
-                <h3>Предпросмотр данных</h3>
+                <span class="icon">⚙</span>
+                <h3>ПРЕДПРОСМОТР ДАННЫХ</h3>
                 <span class="preview-count" id="previewCount"></span>
             </div>
             <div class="preview-table-wrapper">
@@ -250,7 +261,7 @@
 
     <!-- SheetJS for Excel parsing -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
-    <script src="upload_script.js?v=2.0"></script>
+    <script src="upload_script.js?v=3.0"></script>
 </body>
 
 </html>

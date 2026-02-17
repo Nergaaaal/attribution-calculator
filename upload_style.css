@@ -1,6 +1,6 @@
 /* =========================================
-   UPLOAD PAGE STYLES — v2.0
-   Nav bar design + scrollable blocks
+   UPLOAD PAGE STYLES — v3.0
+   Matching reference screenshots exactly
    ========================================= */
 
 /* ---- TOP NAVIGATION BAR ---- */
@@ -53,21 +53,14 @@
     font-size: 16px;
 }
 
-/* ---- PAGE WRAPPER ---- */
+/* ---- PAGE WRAPPER (single column) ---- */
 .upload-page-wrapper {
-    max-width: 1600px;
-    margin: 24px auto;
-    padding: 0 32px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    max-width: 960px;
+    margin: 32px auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
     gap: 24px;
-    align-items: start;
-}
-
-@media (max-width: 1200px) {
-    .upload-page-wrapper {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* ---- MAIN UPLOAD CARD ---- */
@@ -82,7 +75,7 @@
     display: flex;
     align-items: center;
     gap: 16px;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .upload-card-header .header-icon {
@@ -102,76 +95,9 @@
     margin: 4px 0 0;
 }
 
-.header-divider {
-    height: 1px;
-    background: linear-gradient(to right, #E2E8F0, transparent);
-    margin-bottom: 24px;
-}
-
-/* ---- DROP ZONE ---- */
-.upload-dropzone {
-    border: 2px dashed #CBD5E1;
-    border-radius: 16px;
-    padding: 52px 32px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    background: #F8FAFC;
-    position: relative;
-}
-
-.upload-dropzone:hover,
-.upload-dropzone.dragover {
-    border-color: #667eea;
-    background: #F0F4FF;
-    transform: scale(1.01);
-}
-
-.dropzone-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-}
-
-.dropzone-icon {
-    font-size: 52px;
-    animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-8px);
-    }
-}
-
-.dropzone-content h2 {
-    font-size: 16px;
-    font-weight: 600;
-    color: #334155;
-    margin: 0;
-}
-
-.dropzone-link {
-    color: #667eea;
-    text-decoration: underline;
-}
-
-.dropzone-content p {
-    font-size: 13px;
-    color: #94A3B8;
-    margin: 0;
-}
-
 /* ---- FILE INFO ---- */
 .upload-info {
-    margin-top: 16px;
+    margin-bottom: 16px;
 }
 
 .file-info {
@@ -226,7 +152,7 @@
 
 /* ---- SHEET SELECTOR ---- */
 .sheet-selector {
-    margin-top: 16px;
+    margin-bottom: 16px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -243,6 +169,71 @@
     white-space: nowrap;
 }
 
+/* ---- DROP ZONE ---- */
+.upload-dropzone {
+    border: 2px dashed #CBD5E1;
+    border-radius: 16px;
+    padding: 52px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #F8FAFC;
+    position: relative;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone.dragover {
+    border-color: #667eea;
+    background: #F0F4FF;
+    transform: scale(1.01);
+}
+
+.upload-dropzone.hidden-zone {
+    display: none;
+}
+
+.dropzone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.dropzone-icon {
+    font-size: 52px;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+.dropzone-content h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #334155;
+    margin: 0;
+}
+
+.dropzone-link {
+    color: #667eea;
+    text-decoration: underline;
+}
+
+.dropzone-content p {
+    font-size: 13px;
+    color: #94A3B8;
+    margin: 0;
+}
+
 /* ---- COLUMN MAPPING ---- */
 .column-mapping {
     margin-top: 24px;
@@ -250,11 +241,23 @@
     border-top: 1px solid #E2E8F0;
 }
 
-.column-mapping h3 {
-    font-size: 16px;
+.mapping-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.mapping-section-header .mapping-icon {
+    font-size: 18px;
+}
+
+.mapping-section-header h3 {
+    font-size: 14px;
     font-weight: 700;
     color: #334155;
-    margin: 0 0 8px;
+    margin: 0;
+    letter-spacing: 0.5px;
 }
 
 .mapping-hint {
@@ -263,21 +266,30 @@
     margin: 0 0 20px;
 }
 
-.mapping-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+/* 3-column mapping grid */
+.mapping-grid-3col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
     margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+    .mapping-grid-3col {
+        grid-template-columns: 1fr;
+    }
 }
 
 .mapping-item label {
     display: block;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: #64748B;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
     margin-bottom: 8px;
-    letter-spacing: 0.5px;
+}
+
+.mapping-item label .field-icon {
+    margin-right: 4px;
 }
 
 .mapping-select {
@@ -293,6 +305,7 @@
     background: white;
     cursor: pointer;
     font-family: 'Inter', sans-serif;
+    appearance: auto;
 }
 
 .mapping-select:focus {
@@ -300,44 +313,10 @@
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-.channel-cols-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.channel-col-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    background: #F8FAFC;
-    border: 1px solid #E2E8F0;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #475569;
-    cursor: pointer;
-    transition: all 0.2s;
-    user-select: none;
-}
-
-.channel-col-checkbox:hover {
-    border-color: #667eea;
-}
-
-.channel-col-checkbox input:checked+span {
-    color: #667eea;
-    font-weight: 600;
-}
-
-.channel-col-checkbox input {
-    accent-color: #667eea;
-}
-
+/* GREEN gradient button */
 .run-analysis-btn {
     width: 100%;
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #10B981, #059669);
     color: white;
     padding: 16px 28px;
     border-radius: 12px;
@@ -345,7 +324,7 @@
     font-weight: 700;
     border: none;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
     transition: all 0.3s;
     display: flex;
     align-items: center;
@@ -356,7 +335,7 @@
 
 .run-analysis-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
 }
 
 .run-analysis-btn:disabled {
@@ -373,7 +352,7 @@
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
-    max-height: 650px;
+    max-height: 500px;
 }
 
 .preview-header {
@@ -385,33 +364,32 @@
 }
 
 .preview-header .icon {
-    font-size: 20px;
+    font-size: 18px;
+    color: #667eea;
 }
 
 .preview-header h3 {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
     color: #334155;
     flex: 1;
     margin: 0;
+    letter-spacing: 0.5px;
 }
 
 .preview-count {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     color: #667eea;
-    background: #EFF6FF;
-    padding: 4px 12px;
-    border-radius: 20px;
+    white-space: nowrap;
 }
 
-/* KEY FIX: Scrollable table container */
+/* Scrollable table container */
 .preview-table-wrapper {
     overflow: auto;
     flex: 1;
     border-radius: 10px;
     border: 1px solid #E2E8F0;
-    max-height: 550px;
 }
 
 .preview-table {
@@ -450,9 +428,9 @@
 
 /* ---- RESULTS SECTION ---- */
 .upload-results-section {
-    max-width: 1600px;
+    max-width: 960px;
     margin: 0 auto;
-    padding: 0 32px 48px;
+    padding: 0 24px 48px;
 }
 
 .upload-models-grid {
@@ -462,7 +440,7 @@
     margin-bottom: 24px;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 768px) {
     .upload-models-grid {
         grid-template-columns: 1fr;
     }
@@ -579,7 +557,7 @@
     background: white;
 }
 
-/* Custom scrollbar for scroll containers */
+/* Custom scrollbar */
 .preview-table-wrapper::-webkit-scrollbar,
 .model-results-scroll::-webkit-scrollbar,
 .scenarios-table-scroll::-webkit-scrollbar {

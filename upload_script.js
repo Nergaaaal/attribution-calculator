@@ -1,6 +1,6 @@
 // ============================================
 // Upload Page — CSV/Excel Attribution Analysis
-// v2.0 — with sheet selector, top-5, expand
+// v3.0 — 3-column mapping (ID, Channel, Date)
 // ============================================
 
 let uploadedData = [];
@@ -8,7 +8,7 @@ let fileHeaders = [];
 let channelColumns = [];
 let clientIdColumn = 0;
 let journeys = [];
-let currentWorkbook = null; // Store workbook for sheet switching
+let currentWorkbook = null;
 
 const DEFAULT_SCORE = 3;
 const CHANNEL_COLORS = [
@@ -75,10 +75,11 @@ function handleFile(file) {
         return;
     }
 
-    // Show file info
+    // Show file info, hide dropzone
     document.getElementById('uploadInfo').style.display = 'block';
+    document.getElementById('dropzone').classList.add('hidden-zone');
     document.getElementById('fileName').textContent = file.name;
-    document.getElementById('fileMeta').textContent = `${(file.size / 1024).toFixed(1)} KB`;
+    document.getElementById('fileMeta').textContent = `${(file.size / 1024).toFixed(1)} Кб`;
 
     const reader = new FileReader();
 
@@ -179,6 +180,7 @@ function clearFile() {
     currentWorkbook = null;
 
     document.getElementById('uploadInfo').style.display = 'none';
+    document.getElementById('dropzone').classList.remove('hidden-zone');
     document.getElementById('previewCard').style.display = 'none';
     document.getElementById('columnMapping').style.display = 'none';
     document.getElementById('resultsSection').style.display = 'none';
@@ -193,34 +195,40 @@ function renderPreview() {
     const body = document.getElementById('previewBody');
     const count = document.getElementById('previewCount');
 
-    count.textContent = `${uploadedData.length} строк`;
+    const showRows = Math.min(uploadedData.length, 10);
+    count.textContent = `Первые ${showRows} из ${uploadedData.length} строк`;
 
     head.innerHTML = '<tr>' + fileHeaders.map(h => `<th>${h}</th>`).join('') + '</tr>';
 
     const preview = uploadedData.slice(0, 10);
     body.innerHTML = preview.map(row =>
-        '<tr>' + fileHeaders.map((_, i) => `<td>${row[i] || ''}</td>`).join('') + '</tr>'
+        '<tr>' + fileHeaders.map((_, i) => `<td>${row[i] != null ? row[i] : ''}</td>`).join('') + '</tr>'
     ).join('');
 }
 
 // ---- COLUMN MAPPING ----
 
 function renderColumnMapping() {
-    const select = document.getElementById('colClientId');
-    select.innerHTML = fileHeaders.map((h, i) =>
-        `<option value="${i}" ${i === 0 ? 'selected' : ''}>${h}</option>`
-    ).join('');
+    const optionsHtml = '<option value="">— Выберите —</option>' +
+        fileHeaders.map((h, i) => `<option value="${i}">${h}</option>`).join('');
 
-    const list = document.getElementById('channelColsList');
-    list.innerHTML = fileHeaders.map((h, i) => {
-        if (i === 0) return '';
-        return `
-            <label class="channel-col-checkbox">
-                <input type="checkbox" value="${i}" checked>
-                <span>${h}</span>
-            </label>
-        `;
-    }).join('');
+    document.getElementById('colClientId').innerHTML = optionsHtml;
+    document.getElementById('colChannel').innerHTML = optionsHtml;
+    document.getElementById('colDate').innerHTML = optionsHtml;
+
+    // Try to auto-detect columns
+    fileHeaders.forEach((h, i) => {
+        const lower = h.toLowerCase();
+        if (lower.includes('id') || lower.includes('клиент') || lower.includes('client')) {
+            document.getElementById('colClientId').value = i;
+        }
+        if (lower.includes('канал') || lower.includes('channel') || lower.includes('отделение') || lower.includes('source') || lower.includes('medium')) {
+            document.getElementById('colChannel').value = i;
+        }
+        if (lower.includes('дата') || lower.includes('date') || lower.includes('время') || lower.includes('time') || lower.includes('регистрац')) {
+            document.getElementById('colDate').value = i;
+        }
+    });
 }
 
 // ---- ANALYSIS ----
@@ -232,16 +240,20 @@ function runAnalysis() {
 
     setTimeout(() => {
         try {
-            clientIdColumn = parseInt(document.getElementById('colClientId').value);
-            channelColumns = [];
-            document.querySelectorAll('#channelColsList input[type="checkbox"]:checked').forEach(cb => {
-                channelColumns.push(parseInt(cb.value));
-            });
+            const clientIdVal = document.getElementById('colClientId').value;
+            const channelVal = document.getElementById('colChannel').value;
 
-            if (channelColumns.length === 0) {
-                alert('Выберите хотя бы один столбец с каналами.');
+            if (!clientIdVal && clientIdVal !== '0') {
+                alert('Выберите столбец с ID клиента.');
                 return;
             }
+            if (!channelVal && channelVal !== '0') {
+                alert('Выберите столбец с каналом коммуникации.');
+                return;
+            }
+
+            clientIdColumn = parseInt(clientIdVal);
+            channelColumns = [parseInt(channelVal)];
 
             buildJourneys();
 
@@ -276,18 +288,25 @@ function runAnalysis() {
 function buildJourneys() {
     journeys = [];
 
+    // Group rows by client ID and build journey paths
+    const clientMap = {};
+
     uploadedData.forEach(row => {
         const clientId = String(row[clientIdColumn] || '').trim();
         if (!clientId) return;
 
-        const path = [];
-        channelColumns.forEach(colIdx => {
-            const value = String(row[colIdx] || '').trim();
-            if (value && value !== '0' && value !== '-' && value.toLowerCase() !== 'null' && value.toLowerCase() !== 'nan') {
-                path.push(value);
-            }
-        });
+        const channelValue = String(row[channelColumns[0]] || '').trim();
+        if (!channelValue || channelValue === '0' || channelValue === '-' || channelValue.toLowerCase() === 'null' || channelValue.toLowerCase() === 'nan') return;
 
+        if (!clientMap[clientId]) {
+            clientMap[clientId] = [];
+        }
+        clientMap[clientId].push(channelValue);
+    });
+
+    // Convert to journeys
+    Object.keys(clientMap).forEach(clientId => {
+        const path = clientMap[clientId];
         if (path.length > 0) {
             journeys.push({ clientId, path });
         }
@@ -420,7 +439,6 @@ function renderModelResults(attribution, containerId, allChannels) {
 
     container.innerHTML = '';
 
-    // Show top 5 by default
     const TOP_N = 5;
     const showBtn = sortedKeys.length > TOP_N;
 
@@ -450,7 +468,6 @@ function renderModelResults(attribution, containerId, allChannels) {
         container.appendChild(el);
     });
 
-    // Show/hide expand button
     const expandBtn = container.closest('.attribution-model').querySelector('.expand-results-btn');
     if (expandBtn) {
         expandBtn.style.display = showBtn ? 'block' : 'none';
@@ -477,7 +494,6 @@ function toggleModelExpand(btn) {
         hiddenItems.forEach(el => el.style.display = 'none');
         btn.textContent = 'Показать все ▼';
         btn.dataset.expanded = 'false';
-        // Scroll container back
         const scrollContainer = container.closest('.model-results-scroll');
         if (scrollContainer) scrollContainer.scrollTop = 0;
     } else {
@@ -553,7 +569,6 @@ function renderScenariosTable(topPaths) {
         tbody.appendChild(tr);
     });
 
-    // Show expand button if more than TOP_N
     if (topPaths.length > TOP_N) {
         expandBtn.style.display = 'block';
         expandBtn.textContent = `Показать все сценарии (${topPaths.length}) ▼`;
@@ -572,7 +587,6 @@ function toggleTableExpand() {
         hiddenRows.forEach(r => r.style.display = 'none');
         btn.textContent = btn.textContent.replace('▲', '▼').replace('Скрыть', 'Показать все сценарии');
         btn.dataset.expanded = 'false';
-        // Scroll back to top
         const scrollContainer = document.querySelector('.scenarios-table-scroll');
         if (scrollContainer) scrollContainer.scrollTop = 0;
     } else {
