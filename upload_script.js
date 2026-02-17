@@ -1,357 +1,352 @@
 // ============================================
-// Upload & Attribution Script
+// Upload Page — CSV/Excel Attribution Analysis
 // ============================================
 
-let parsedData = null;    // Raw rows from file
-let workbook = null;      // SheetJS workbook
-let headers = [];         // Column headers
-let sheetNames = [];      // For multi-sheet Excel
+let uploadedData = [];     // Raw parsed rows
+let fileHeaders = [];      // Column headers
+let channelColumns = [];   // Indices of columns used as channels
+let clientIdColumn = 0;    // Index of client ID column
+let journeys = [];         // Processed journeys [{clientId, path: [...]}]
 
-// Default channel scores (same as main page)
-const defaultScores = {
-    'digital': 2, 'digital ads': 2,
-    'stories': 2,
-    'push': 3,
-    'sms': 3,
-    'telemarketing': 5, 'телемаркетинг': 5,
-    'offline': 5,
-};
+// Default channel scores (can be expanded based on uploaded data)
+const DEFAULT_SCORE = 3;
+const CHANNEL_COLORS = [
+    '#3B82F6', '#ED64A6', '#ED8936', '#9F7AEA',
+    '#48BB78', '#667EEA', '#F59E0B', '#EF4444',
+    '#06B6D4', '#8B5CF6', '#10B981', '#F97316'
+];
 
-const channelColors = {
-    'digital': '#3B82F6', 'digital ads': '#3B82F6',
-    'stories': '#8B5CF6',
-    'push': '#F59E0B',
-    'sms': '#10B981',
-    'telemarketing': '#EF4444', 'телемаркетинг': '#EF4444',
-    'offline': '#6366F1',
-};
+document.addEventListener('DOMContentLoaded', init);
 
-// ============================================
-// INIT
-// ============================================
-document.addEventListener('DOMContentLoaded', () => {
-    const dropZone = document.getElementById('dropZone');
+function init() {
+    const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('fileInput');
-    const clearBtn = document.getElementById('clearFileBtn');
-    const processBtn = document.getElementById('processBtn');
-    const sheetSelect = document.getElementById('sheetSelect');
-
-    // Drag & Drop
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('drag-over');
-    });
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('drag-over');
-    });
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
-        const file = e.dataTransfer.files[0];
-        if (file) handleFile(file);
-    });
 
     // Click to upload
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    // File selected
     fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) handleFile(file);
+        if (e.target.files.length > 0) handleFile(e.target.files[0]);
     });
 
-    // Clear
-    clearBtn.addEventListener('click', resetAll);
-
-    // Process
-    processBtn.addEventListener('click', processData);
-
-    // Sheet change
-    sheetSelect.addEventListener('change', () => {
-        const sheetName = sheetSelect.value;
-        loadSheet(sheetName);
+    // Drag & Drop
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
     });
-});
 
-// ============================================
-// FILE HANDLING
-// ============================================
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+    });
+
+    // Clear file
+    document.getElementById('clearFileBtn').addEventListener('click', clearFile);
+
+    // Run analysis
+    document.getElementById('runAnalysisBtn').addEventListener('click', runAnalysis);
+}
+
+// ---- FILE HANDLING ----
+
 function handleFile(file) {
     const ext = file.name.split('.').pop().toLowerCase();
-    if (!['xlsx', 'xls', 'csv'].includes(ext)) {
-        alert('Поддерживаются только .xlsx, .xls, .csv файлы');
+
+    if (!['csv', 'xlsx', 'xls'].includes(ext)) {
+        alert('Поддерживаемые форматы: .csv, .xlsx, .xls');
         return;
     }
 
     // Show file info
+    document.getElementById('uploadInfo').style.display = 'block';
     document.getElementById('fileName').textContent = file.name;
-    document.getElementById('fileMeta').textContent = `${(file.size / 1024).toFixed(1)} КБ`;
-    document.getElementById('fileInfo').classList.remove('hidden');
-    document.getElementById('dropZone').classList.add('hidden');
+    document.getElementById('fileMeta').textContent = `${(file.size / 1024).toFixed(1)} KB`;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+
+    reader.onload = function (e) {
         try {
-            const data = new Uint8Array(e.target.result);
-            workbook = XLSX.read(data, { type: 'array', cellDates: true });
-            sheetNames = workbook.SheetNames;
-
-            // Sheet selector
-            if (sheetNames.length > 1) {
-                const sel = document.getElementById('sheetSelect');
-                sel.innerHTML = '';
-                sheetNames.forEach(name => {
-                    const opt = document.createElement('option');
-                    opt.value = name;
-                    opt.textContent = name;
-                    sel.appendChild(opt);
-                });
-                document.getElementById('sheetSelector').classList.remove('hidden');
+            if (ext === 'csv') {
+                parseCSV(e.target.result);
+            } else {
+                parseExcel(e.target.result);
             }
-
-            loadSheet(sheetNames[0]);
         } catch (err) {
-            alert('Ошибка чтения файла: ' + err.message);
-            console.error(err);
+            console.error('Parse error:', err);
+            alert('Ошибка при чтении файла: ' + err.message);
         }
     };
-    reader.readAsArrayBuffer(file);
+
+    if (ext === 'csv') {
+        reader.readAsText(file);
+    } else {
+        reader.readAsArrayBuffer(file);
+    }
 }
 
-function loadSheet(sheetName) {
+function parseCSV(text) {
+    // Handle both comma and semicolon separators
+    const firstLine = text.split('\n')[0];
+    const separator = firstLine.includes(';') ? ';' : ',';
+
+    const lines = text.trim().split('\n');
+    fileHeaders = lines[0].split(separator).map(h => h.trim().replace(/^"|"$/g, ''));
+
+    uploadedData = [];
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(separator).map(v => v.trim().replace(/^"|"$/g, ''));
+        if (values.length >= fileHeaders.length && values.some(v => v)) {
+            uploadedData.push(values);
+        }
+    }
+
+    onDataLoaded();
+}
+
+function parseExcel(buffer) {
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
     if (json.length < 2) {
-        alert('Файл пуст или содержит только заголовки');
+        alert('Файл пуст или содержит только заголовки.');
         return;
     }
 
-    headers = json[0].map(h => String(h).trim());
-    parsedData = json.slice(1).filter(row => row.some(cell => cell !== ''));
+    fileHeaders = json[0].map(h => String(h || '').trim());
+    uploadedData = json.slice(1).filter(row => row.some(v => v !== null && v !== undefined && v !== ''));
 
-    renderPreview();
-    setupColumnMapping();
-
-    document.getElementById('dataPreview').classList.remove('hidden');
-    document.getElementById('columnMapping').classList.remove('hidden');
-    document.getElementById('uploadResults').classList.add('hidden');
+    onDataLoaded();
 }
 
-function resetAll() {
-    parsedData = null;
-    workbook = null;
-    headers = [];
+function onDataLoaded() {
+    renderPreview();
+    renderColumnMapping();
+    document.getElementById('previewCard').style.display = 'block';
+    document.getElementById('columnMapping').style.display = 'block';
+}
 
-    document.getElementById('fileInfo').classList.add('hidden');
-    document.getElementById('dropZone').classList.remove('hidden');
-    document.getElementById('dataPreview').classList.add('hidden');
-    document.getElementById('columnMapping').classList.add('hidden');
-    document.getElementById('sheetSelector').classList.add('hidden');
-    document.getElementById('uploadResults').classList.add('hidden');
+function clearFile() {
+    uploadedData = [];
+    fileHeaders = [];
+    channelColumns = [];
+    journeys = [];
+
+    document.getElementById('uploadInfo').style.display = 'none';
+    document.getElementById('previewCard').style.display = 'none';
+    document.getElementById('columnMapping').style.display = 'none';
+    document.getElementById('resultsSection').style.display = 'none';
     document.getElementById('fileInput').value = '';
 }
 
-// ============================================
-// PREVIEW
-// ============================================
+// ---- DATA PREVIEW ----
+
 function renderPreview() {
     const head = document.getElementById('previewHead');
     const body = document.getElementById('previewBody');
+    const count = document.getElementById('previewCount');
 
-    head.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+    count.textContent = `${uploadedData.length} строк`;
 
-    const rows = parsedData.slice(0, 10);
-    body.innerHTML = rows.map(row =>
-        '<tr>' + headers.map((_, i) => `<td>${row[i] !== undefined ? row[i] : ''}</td>`).join('') + '</tr>'
+    // Header
+    head.innerHTML = '<tr>' + fileHeaders.map(h => `<th>${h}</th>`).join('') + '</tr>';
+
+    // First 10 rows
+    const preview = uploadedData.slice(0, 10);
+    body.innerHTML = preview.map(row =>
+        '<tr>' + fileHeaders.map((_, i) => `<td>${row[i] || ''}</td>`).join('') + '</tr>'
+    ).join('');
+}
+
+// ---- COLUMN MAPPING ----
+
+function renderColumnMapping() {
+    // Client ID dropdown
+    const select = document.getElementById('colClientId');
+    select.innerHTML = fileHeaders.map((h, i) =>
+        `<option value="${i}" ${i === 0 ? 'selected' : ''}>${h}</option>`
     ).join('');
 
-    document.getElementById('previewBadge').textContent =
-        `Первые ${Math.min(10, parsedData.length)} из ${parsedData.length} строк`;
+    // Channel columns as checkboxes
+    const list = document.getElementById('channelColsList');
+    list.innerHTML = fileHeaders.map((h, i) => {
+        if (i === 0) return ''; // Skip first (likely ID)
+        return `
+            <label class="channel-col-checkbox">
+                <input type="checkbox" value="${i}" checked>
+                <span>${h}</span>
+            </label>
+        `;
+    }).join('');
 }
 
-// ============================================
-// COLUMN MAPPING
-// ============================================
-function setupColumnMapping() {
-    const selectors = ['mapClientId', 'mapChannel', 'mapTimestamp'];
-    const hints = ['id', 'channel', 'date'];
+// ---- ANALYSIS ----
 
-    selectors.forEach((selId, idx) => {
-        const sel = document.getElementById(selId);
-        sel.innerHTML = '<option value="">— Выберите —</option>';
-        headers.forEach((h, i) => {
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = h;
-            // Auto-detect common column names
-            const lower = h.toLowerCase();
-            if (idx === 0 && (lower.includes('client') || lower.includes('клиент') || lower.includes('id') || lower.includes('iin'))) {
-                opt.selected = true;
+function runAnalysis() {
+    const btn = document.getElementById('runAnalysisBtn');
+    btn.innerHTML = 'Расчет...';
+    btn.disabled = true;
+
+    setTimeout(() => {
+        try {
+            // Get column mapping
+            clientIdColumn = parseInt(document.getElementById('colClientId').value);
+            channelColumns = [];
+            document.querySelectorAll('#channelColsList input[type="checkbox"]:checked').forEach(cb => {
+                channelColumns.push(parseInt(cb.value));
+            });
+
+            if (channelColumns.length === 0) {
+                alert('Выберите хотя бы один столбец с каналами.');
+                return;
             }
-            if (idx === 1 && (lower.includes('channel') || lower.includes('канал') || lower.includes('communication') || lower.includes('коммуникаци'))) {
-                opt.selected = true;
+
+            // Build journeys
+            buildJourneys();
+
+            if (journeys.length === 0) {
+                alert('Не удалось построить пути клиентов. Проверьте данные.');
+                return;
             }
-            if (idx === 2 && (lower.includes('date') || lower.includes('дата') || lower.includes('time') || lower.includes('время') || lower.includes('timestamp'))) {
-                opt.selected = true;
-            }
-            sel.appendChild(opt);
-        });
-    });
-}
 
-// ============================================
-// PROCESS DATA → JOURNEYS → ATTRIBUTION
-// ============================================
-function processData() {
-    const clientIdx = parseInt(document.getElementById('mapClientId').value);
-    const channelIdx = parseInt(document.getElementById('mapChannel').value);
-    const timestampIdx = parseInt(document.getElementById('mapTimestamp').value);
+            // Calculate all 4 models
+            const allChannels = getUniqueChannels();
+            const results = calculateAllModels(allChannels);
 
-    if (isNaN(clientIdx) || isNaN(channelIdx)) {
-        alert('Пожалуйста, выберите колонки ID Клиента и Канал');
-        return;
-    }
+            // Get path frequencies
+            const topPaths = analyzePathFrequencies();
 
-    // Build journeys grouped by client
-    const clientMap = {};
-    parsedData.forEach(row => {
-        const clientId = String(row[clientIdx]).trim();
-        const channel = String(row[channelIdx]).trim().toLowerCase();
-        if (!clientId || !channel) return;
+            // Render everything
+            renderSummaryCards(allChannels, topPaths);
+            renderAllModelResults(results, allChannels);
+            renderComparisonBars(results, allChannels);
+            renderScenariosTable(topPaths);
+            renderInsight(results, allChannels);
 
-        let timestamp = null;
-        if (!isNaN(timestampIdx) && row[timestampIdx]) {
-            timestamp = parseDate(row[timestampIdx]);
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        } catch (e) {
+            console.error('Analysis Error:', e);
+            alert('Ошибка анализа: ' + e.message);
+        } finally {
+            btn.innerHTML = '<span class="arrow">▶</span> Рассчитать атрибуцию';
+            btn.disabled = false;
         }
+    }, 300);
+}
 
-        if (!clientMap[clientId]) clientMap[clientId] = [];
-        clientMap[clientId].push({ channel, timestamp });
-    });
+function buildJourneys() {
+    journeys = [];
 
-    // Sort each client's touchpoints by timestamp (if available)
-    const journeys = [];
-    Object.keys(clientMap).forEach(clientId => {
-        const touches = clientMap[clientId];
-        if (touches[0].timestamp) {
-            touches.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    uploadedData.forEach(row => {
+        const clientId = String(row[clientIdColumn] || '').trim();
+        if (!clientId) return;
+
+        const path = [];
+        channelColumns.forEach(colIdx => {
+            const value = String(row[colIdx] || '').trim();
+            if (value && value !== '0' && value !== '-' && value.toLowerCase() !== 'null' && value.toLowerCase() !== 'nan') {
+                path.push(value);
+            }
+        });
+
+        if (path.length > 0) {
+            journeys.push({ clientId, path });
         }
-        journeys.push({
-            clientId,
-            path: touches.map(t => t.channel)
-        });
     });
-
-    if (journeys.length === 0) {
-        alert('Не удалось построить пути клиентов. Проверьте маппинг колонок.');
-        return;
-    }
-
-    // Discover unique channels
-    const allChannels = [...new Set(journeys.flatMap(j => j.path))];
-
-    // Calculate all 4 models
-    const weighted = calcWeighted(journeys, allChannels);
-    const uShape = calcUShape(journeys, allChannels);
-    const lastTouch = calcLastTouch(journeys, allChannels);
-    const firstTouch = calcFirstTouch(journeys, allChannels);
-
-    // Path frequencies
-    const pathFreqs = calcPathFrequencies(journeys);
-
-    // Render everything
-    renderSummaryCards(journeys, pathFreqs, allChannels);
-    renderModelResults(weighted, 'upWeightedResults', allChannels);
-    renderModelResults(uShape, 'upUShapeResults', allChannels);
-    renderModelResults(lastTouch, 'upLastTouchResults', allChannels);
-    renderModelResults(firstTouch, 'upFirstTouchResults', allChannels);
-    renderComparisonBars(weighted, uShape, lastTouch, firstTouch, allChannels, journeys.length);
-    renderScenariosTable(pathFreqs, journeys.length);
-    renderInsights(weighted, uShape, lastTouch, firstTouch, allChannels, journeys.length);
-
-    document.getElementById('uploadResults').classList.remove('hidden');
-    document.getElementById('uploadResults').scrollIntoView({ behavior: 'smooth' });
 }
 
-function parseDate(val) {
-    if (val instanceof Date) return val.getTime();
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? null : d.getTime();
+function getUniqueChannels() {
+    const set = new Set();
+    journeys.forEach(j => j.path.forEach(ch => set.add(ch)));
+    return Array.from(set);
 }
 
-// ============================================
-// ATTRIBUTION MODELS
-// ============================================
+// ---- ATTRIBUTION CALCULATIONS ----
 
-function getScore(channel) {
-    return defaultScores[channel] || 2;
-}
+function calculateAllModels(allChannels) {
+    const weighted = {};
+    const uShape = {};
+    const lastTouch = {};
+    const firstTouch = {};
 
-function calcWeighted(journeys, allChannels) {
-    const totals = {};
-    allChannels.forEach(ch => totals[ch] = 0);
-
-    journeys.forEach(j => {
-        const scores = j.path.map(ch => getScore(ch));
-        const sum = scores.reduce((a, b) => a + b, 0);
-        if (sum === 0) return;
-        j.path.forEach((ch, i) => {
-            totals[ch] += scores[i] / sum;
-        });
+    allChannels.forEach(ch => {
+        weighted[ch] = 0;
+        uShape[ch] = 0;
+        lastTouch[ch] = 0;
+        firstTouch[ch] = 0;
     });
-
-    return totals;
-}
-
-function calcUShape(journeys, allChannels) {
-    const totals = {};
-    allChannels.forEach(ch => totals[ch] = 0);
 
     journeys.forEach(j => {
         const path = j.path;
         const n = path.length;
         if (n === 0) return;
 
+        // --- Weighted ---
+        const totalScore = n * DEFAULT_SCORE;
+        if (totalScore > 0) {
+            path.forEach(ch => {
+                weighted[ch] = (weighted[ch] || 0) + (DEFAULT_SCORE / totalScore);
+            });
+        }
+
+        // --- Last Touch ---
+        lastTouch[path[n - 1]] = (lastTouch[path[n - 1]] || 0) + 1;
+
+        // --- First Touch ---
+        firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
+
+        // --- U-Shape ---
         if (n === 1) {
-            totals[path[0]] += 1;
+            uShape[path[0]] = (uShape[path[0]] || 0) + 1;
         } else if (n === 2) {
-            totals[path[0]] += 0.5;
-            totals[path[1]] += 0.5;
+            uShape[path[0]] = (uShape[path[0]] || 0) + 0.5;
+            uShape[path[1]] = (uShape[path[1]] || 0) + 0.5;
         } else {
-            totals[path[0]] += 0.4;
-            totals[path[n - 1]] += 0.4;
+            uShape[path[0]] = (uShape[path[0]] || 0) + 0.4;
+            uShape[path[n - 1]] = (uShape[path[n - 1]] || 0) + 0.4;
             const mid = 0.2 / (n - 2);
             for (let k = 1; k < n - 1; k++) {
-                totals[path[k]] += mid;
+                uShape[path[k]] = (uShape[path[k]] || 0) + mid;
             }
         }
     });
 
-    return totals;
+    // Convert raw totals to percentages
+    const totalJourneys = journeys.length;
+    const toPercent = (obj) => {
+        const total = Object.values(obj).reduce((a, b) => a + b, 0);
+        const result = {};
+        if (total > 0) {
+            Object.keys(obj).forEach(k => {
+                result[k] = (obj[k] / total) * 100;
+            });
+        }
+        return result;
+    };
+
+    return {
+        weighted: toPercent(weighted),
+        uShape: toPercent(uShape),
+        lastTouch: toPercent(lastTouch),
+        firstTouch: toPercent(firstTouch),
+        // Keep raw for bars
+        rawWeighted: weighted,
+        rawUShape: uShape,
+        rawLastTouch: lastTouch,
+        rawFirstTouch: firstTouch
+    };
 }
 
-function calcLastTouch(journeys, allChannels) {
-    const totals = {};
-    allChannels.forEach(ch => totals[ch] = 0);
-
-    journeys.forEach(j => {
-        if (j.path.length === 0) return;
-        totals[j.path[j.path.length - 1]] += 1;
-    });
-
-    return totals;
-}
-
-function calcFirstTouch(journeys, allChannels) {
-    const totals = {};
-    allChannels.forEach(ch => totals[ch] = 0);
-
-    journeys.forEach(j => {
-        if (j.path.length === 0) return;
-        totals[j.path[0]] += 1;
-    });
-
-    return totals;
-}
-
-function calcPathFrequencies(journeys) {
+function analyzePathFrequencies() {
     const counts = {};
     journeys.forEach(j => {
         const key = j.path.join(' → ');
@@ -363,166 +358,177 @@ function calcPathFrequencies(journeys) {
         .sort((a, b) => b.count - a.count);
 }
 
-// ============================================
-// RENDERING
-// ============================================
+// ---- RENDERING ----
 
-function getChannelColor(channel) {
-    return channelColors[channel] || '#64748B';
+function getChannelColor(index) {
+    return CHANNEL_COLORS[index % CHANNEL_COLORS.length];
 }
 
-function renderSummaryCards(journeys, pathFreqs, allChannels) {
-    document.getElementById('upTotalClients').textContent = journeys.length;
-    document.getElementById('upTotalClientsSub').textContent = 'уникальных ID';
+function renderSummaryCards(allChannels, topPaths) {
+    document.getElementById('rTotalClients').textContent = journeys.length;
+    document.getElementById('rTotalClientsSub').textContent = `${topPaths.length} уникальных путей`;
+    document.getElementById('rUniqueChannels').textContent = allChannels.length;
+    document.getElementById('rChannelsList').textContent = allChannels.slice(0, 4).join(', ') + (allChannels.length > 4 ? '...' : '');
 
-    const totalTouches = journeys.reduce((sum, j) => sum + j.path.length, 0);
-    document.getElementById('upTotalTouches').textContent = totalTouches;
-    document.getElementById('upTotalTouchesSub').textContent = `${allChannels.length} уникальных каналов`;
-
-    const avgLen = (totalTouches / journeys.length).toFixed(1);
-    document.getElementById('upAvgLength').textContent = avgLen;
-
-    if (pathFreqs.length > 0) {
-        document.getElementById('upTopPath').textContent = pathFreqs[0].path;
-        const pct = ((pathFreqs[0].count / journeys.length) * 100).toFixed(1);
-        document.getElementById('upTopPathPercent').textContent = `${pct}% от всех клиентов`;
+    if (topPaths.length > 0) {
+        document.getElementById('rTopPath').textContent = topPaths[0].path;
+        const pct = ((topPaths[0].count / journeys.length) * 100).toFixed(1);
+        document.getElementById('rTopPathPercent').textContent = `${pct}% от всех клиентов`;
     }
+
+    const avgLen = journeys.reduce((sum, j) => sum + j.path.length, 0) / journeys.length;
+    document.getElementById('rAvgLength').textContent = avgLen.toFixed(1);
 }
 
-function renderModelResults(totals, containerId, allChannels) {
+function renderModelResults(attribution, containerId, allChannels) {
     const container = document.getElementById(containerId);
-    const totalSum = Object.values(totals).reduce((a, b) => a + b, 0);
-    if (totalSum === 0) {
-        container.innerHTML = '<div class="sim-empty-state"><div class="empty-text">Нет данных</div></div>';
+    if (!container) return;
+
+    const sortedKeys = Object.keys(attribution).sort((a, b) => attribution[b] - attribution[a]);
+
+    if (sortedKeys.length === 0) {
+        container.innerHTML = '<div class="sim-empty-state"><div class="empty-icon">✨</div><div class="empty-text">Нет данных</div></div>';
         return;
     }
 
-    // Sort by value descending
-    const sorted = allChannels
-        .filter(ch => totals[ch] > 0)
-        .sort((a, b) => totals[b] - totals[a]);
-
     container.innerHTML = '';
 
-    sorted.forEach((ch, index) => {
-        const percentage = (totals[ch] / totalSum) * 100;
-        const color = getChannelColor(ch);
+    sortedKeys.forEach((ch, index) => {
+        const pct = attribution[ch];
+        if (pct <= 0) return;
+
+        const colorIdx = allChannels.indexOf(ch);
+        const color = getChannelColor(colorIdx);
 
         const el = document.createElement('div');
         el.className = 'result-item';
         el.innerHTML = `
             <div class="result-rank">#${index + 1}</div>
             <div class="result-header">
-                <span class="result-channel-name">${capitalize(ch)}</span>
+                <span class="result-channel-name">${ch}</span>
             </div>
-            <div class="result-percent">${percentage.toFixed(1)}%</div>
+            <div class="result-percent">${pct.toFixed(1)}%</div>
             <div class="result-bar-container">
-                <div class="result-bar" style="width: ${percentage}%; background: ${color}"></div>
+                <div class="result-bar" style="width: ${pct}%; background-color: ${color};"></div>
             </div>
         `;
         container.appendChild(el);
     });
 }
 
-function renderComparisonBars(weighted, uShape, lastTouch, firstTouch, allChannels, totalJourneys) {
-    const container = document.getElementById('upBarsContainer');
-    container.innerHTML = '';
-
-    const scale = totalJourneys * 0.8 || 1;
-
-    allChannels
-        .sort((a, b) => (lastTouch[b] || 0) - (lastTouch[a] || 0))
-        .forEach(ch => {
-            const vLast = Math.round(lastTouch[ch] || 0);
-            const vWeighted = Math.round(weighted[ch] || 0);
-            const vUShape = Math.round(uShape[ch] || 0);
-            const vFirst = Math.round(firstTouch[ch] || 0);
-
-            if (vLast + vWeighted + vUShape + vFirst === 0) return;
-
-            const wLast = Math.min((vLast / scale) * 100, 100);
-            const wWeighted = Math.min((vWeighted / scale) * 100, 100);
-            const wUShape = Math.min((vUShape / scale) * 100, 100);
-            const wFirst = Math.min((vFirst / scale) * 100, 100);
-
-            const html = `
-                <div class="bar-group">
-                    <div class="bar-group-header">
-                        <span>${capitalize(ch)}</span>
-                        <span class="bar-stats">Last: ${vLast} | Score: ${vWeighted} | U: ${vUShape} | First: ${vFirst}</span>
-                    </div>
-                    ${wLast > 0 ? `<div class="bar-row"><div class="bar-fill fill-gray" style="width: ${wLast}%"></div></div>` : ''}
-                    ${wWeighted > 0 ? `<div class="bar-row"><div class="bar-fill fill-green" style="width: ${wWeighted}%"></div></div>` : ''}
-                    ${wUShape > 0 ? `<div class="bar-row"><div class="bar-fill fill-blue" style="width: ${wUShape}%"></div></div>` : ''}
-                    ${wFirst > 0 ? `<div class="bar-row"><div class="bar-fill fill-orange" style="width: ${wFirst}%"></div></div>` : ''}
-                </div>
-            `;
-            container.innerHTML += html;
-        });
+function renderAllModelResults(results, allChannels) {
+    renderModelResults(results.weighted, 'uploadWeightedResults', allChannels);
+    renderModelResults(results.uShape, 'uploadUShapeResults', allChannels);
+    renderModelResults(results.lastTouch, 'uploadLastTouchResults', allChannels);
+    renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels);
 }
 
-function renderScenariosTable(pathFreqs, totalCount) {
-    const tbody = document.getElementById('upTableBody');
+function renderComparisonBars(results, allChannels) {
+    const container = document.getElementById('uploadBarsContainer');
+    container.innerHTML = '';
+
+    const totalJourneys = journeys.length;
+    const maxBase = totalJourneys * 0.8 || 1;
+
+    allChannels.forEach((ch, idx) => {
+        const valLast = Math.round(results.rawLastTouch[ch] || 0);
+        const valFirst = Math.round(results.rawFirstTouch[ch] || 0);
+        const valWeighted = Math.round(results.rawWeighted[ch] || 0);
+        const valUShape = Math.round(results.rawUShape[ch] || 0);
+
+        if (valLast + valFirst + valWeighted + valUShape === 0) return;
+
+        const scale = maxBase || 1;
+        const wLast = Math.min((valLast / scale) * 100, 100);
+        const wFirst = Math.min((valFirst / scale) * 100, 100);
+        const wWeighted = Math.min((valWeighted / scale) * 100, 100);
+        const wUShape = Math.min((valUShape / scale) * 100, 100);
+
+        const html = `
+            <div class="bar-group">
+                <div class="bar-group-header">
+                    <span>${ch}</span>
+                    <span class="bar-stats">Last: ${valLast} | First: ${valFirst} | Score: ${valWeighted} | U: ${valUShape}</span>
+                </div>
+                ${wLast > 0 ? `<div class="bar-row"><div class="bar-fill fill-gray" style="width: ${wLast}%"></div></div>` : ''}
+                ${wFirst > 0 ? `<div class="bar-row"><div class="bar-fill fill-green" style="width: ${wFirst}%"></div></div>` : ''}
+                ${wWeighted > 0 ? `<div class="bar-row"><div class="bar-fill fill-purple" style="width: ${wWeighted}%"></div></div>` : ''}
+                ${wUShape > 0 ? `<div class="bar-row"><div class="bar-fill fill-blue" style="width: ${wUShape}%"></div></div>` : ''}
+            </div>
+        `;
+        container.innerHTML += html;
+    });
+}
+
+function renderScenariosTable(topPaths) {
+    const tbody = document.getElementById('uploadTableBody');
     tbody.innerHTML = '';
 
-    if (pathFreqs.length === 0) {
+    const totalCount = journeys.length || 1;
+
+    if (topPaths.length === 0) {
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Нет данных</td></tr>';
         return;
     }
 
-    // Show top 20
-    pathFreqs.slice(0, 20).forEach(item => {
+    // Show top 20 paths
+    topPaths.slice(0, 20).forEach(item => {
         const pct = ((item.count / totalCount) * 100).toFixed(1);
-        tbody.innerHTML += `
+        const row = `
             <tr>
                 <td>${item.path}</td>
-                <td class="col-number" style="width:110px;text-align:right"><strong>${item.count}</strong></td>
-                <td class="col-number" style="width:110px;text-align:right;color:#64748B">${pct}%</td>
+                <td class="col-number" style="width: 110px; text-align: right;"><strong>${item.count}</strong></td>
+                <td class="col-number" style="width: 110px; text-align: right; color:#64748B">${pct}%</td>
             </tr>
         `;
+        tbody.innerHTML += row;
     });
 }
 
-function renderInsights(weighted, uShape, lastTouch, firstTouch, allChannels, totalJourneys) {
-    const container = document.getElementById('upInsightText');
-    const totalW = Object.values(weighted).reduce((a, b) => a + b, 0) || 1;
-    const totalU = Object.values(uShape).reduce((a, b) => a + b, 0) || 1;
+function renderInsight(results, allChannels) {
+    const container = document.getElementById('uploadInsightText');
+    if (!container) return;
 
-    // Find channel with biggest difference between models
-    let maxDiffCh = allChannels[0];
+    // Find channel with highest U-Shape vs Weighted difference
+    let maxDiffChannel = '';
     let maxDiff = 0;
+
     allChannels.forEach(ch => {
-        const wPct = (weighted[ch] / totalW) * 100;
-        const uPct = (uShape[ch] / totalU) * 100;
-        const diff = Math.abs(wPct - uPct);
+        const uVal = results.uShape[ch] || 0;
+        const wVal = results.weighted[ch] || 0;
+        const diff = Math.abs(uVal - wVal);
         if (diff > maxDiff) {
             maxDiff = diff;
-            maxDiffCh = ch;
+            maxDiffChannel = ch;
         }
     });
 
-    const wPct = ((weighted[maxDiffCh] / totalW) * 100).toFixed(1);
-    const uPct = ((uShape[maxDiffCh] / totalU) * 100).toFixed(1);
-    const ltCount = Math.round(lastTouch[maxDiffCh] || 0);
-    const ftCount = Math.round(firstTouch[maxDiffCh] || 0);
+    let text = '';
 
-    let text = `<strong>${capitalize(maxDiffCh)}</strong> показывает наибольшую разницу между моделями: `;
-    text += `Weighted Score даёт <strong>${wPct}%</strong>, тогда как U-Shape — <strong>${uPct}%</strong>. `;
-    text += `По Last Touch: <strong>${ltCount}</strong> продаж, по First Touch: <strong>${ftCount}</strong> продаж.`;
+    if (maxDiffChannel && maxDiff > 1) {
+        const uVal = results.uShape[maxDiffChannel] || 0;
+        const wVal = results.weighted[maxDiffChannel] || 0;
 
-    if (maxDiff > 10) {
-        text += `<br><br>⚠️ Разница в ${maxDiff.toFixed(1)}% — это значительно. Рекомендуем проверить баллы каналов и позиции в пути клиента.`;
+        if (uVal > wVal) {
+            text += `<b>${maxDiffChannel}</b> получает на <b>${(uVal - wVal).toFixed(1)}%</b> больше атрибуции в U-Shape модели, чем в Weighted. Это означает, что канал часто стоит на первой или последней позиции в пути клиента.`;
+        } else {
+            text += `<b>${maxDiffChannel}</b> получает на <b>${(wVal - uVal).toFixed(1)}%</b> больше атрибуции в Weighted модели, чем в U-Shape. Это означает, что канал часто участвует в пути, но не как первый или последний контакт.`;
+        }
+    } else {
+        text += 'Модели показывают схожие результаты для всех каналов.';
     }
 
-    // Average journey length insight
-    const avgLen = allChannels.length > 0 ?
-        (Object.values(lastTouch).reduce((a, b) => a + b, 0) > 0 ?
-            (parsedData.length / Object.keys(lastTouch).length).toFixed(0) : '—') : '—';
+    // Add general stats
+    const avgLen = (journeys.reduce((sum, j) => sum + j.path.length, 0) / journeys.length).toFixed(1);
+    text += `<br><br>📊 <b>Средняя длина пути:</b> ${avgLen} касаний. `;
+
+    if (parseFloat(avgLen) <= 1.5) {
+        text += 'Большинство клиентов принимают решение после 1-2 контактов — Last Touch и First Touch дадут похожие результаты.';
+    } else if (parseFloat(avgLen) <= 3) {
+        text += 'Клиенты проходят через несколько касаний — U-Shape модель хорошо подходит для оценки.';
+    } else {
+        text += 'Длинные пути клиентов — рекомендуется использовать Weighted или U-Shape для корректной атрибуции.';
+    }
 
     container.innerHTML = text;
-}
-
-function capitalize(str) {
-    if (!str) return '';
-    return str.charAt(0).toUpperCase() + str.slice(1);
 }
