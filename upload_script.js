@@ -19,7 +19,8 @@ const CHANNEL_COLORS = [
     '#06B6D4', '#8B5CF6', '#10B981', '#F97316'
 ];
 
-document.addEventListener('DOMContentLoaded', init);
+
+// init() is called from HTML after script loads
 
 function init() {
     const dropzone = document.getElementById('dropzone');
