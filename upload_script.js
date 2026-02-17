@@ -1,14 +1,15 @@
 // ============================================
 // Upload Page — CSV/Excel Attribution Analysis
+// v2.0 — with sheet selector, top-5, expand
 // ============================================
 
-let uploadedData = [];     // Raw parsed rows
-let fileHeaders = [];      // Column headers
-let channelColumns = [];   // Indices of columns used as channels
-let clientIdColumn = 0;    // Index of client ID column
-let journeys = [];         // Processed journeys [{clientId, path: [...]}]
+let uploadedData = [];
+let fileHeaders = [];
+let channelColumns = [];
+let clientIdColumn = 0;
+let journeys = [];
+let currentWorkbook = null; // Store workbook for sheet switching
 
-// Default channel scores (can be expanded based on uploaded data)
 const DEFAULT_SCORE = 3;
 const CHANNEL_COLORS = [
     '#3B82F6', '#ED64A6', '#ED8936', '#9F7AEA',
@@ -51,6 +52,17 @@ function init() {
 
     // Run analysis
     document.getElementById('runAnalysisBtn').addEventListener('click', runAnalysis);
+
+    // Sheet selector
+    document.getElementById('sheetSelect').addEventListener('change', onSheetChange);
+
+    // Expand table button
+    document.getElementById('expandTableBtn').addEventListener('click', toggleTableExpand);
+
+    // Expand model buttons
+    document.querySelectorAll('.expand-results-btn').forEach(btn => {
+        btn.addEventListener('click', () => toggleModelExpand(btn));
+    });
 }
 
 // ---- FILE HANDLING ----
@@ -73,6 +85,8 @@ function handleFile(file) {
     reader.onload = function (e) {
         try {
             if (ext === 'csv') {
+                document.getElementById('sheetSelector').style.display = 'none';
+                currentWorkbook = null;
                 parseCSV(e.target.result);
             } else {
                 parseExcel(e.target.result);
@@ -91,7 +105,6 @@ function handleFile(file) {
 }
 
 function parseCSV(text) {
-    // Handle both comma and semicolon separators
     const firstLine = text.split('\n')[0];
     const separator = firstLine.includes(';') ? ';' : ',';
 
@@ -110,13 +123,38 @@ function parseCSV(text) {
 }
 
 function parseExcel(buffer) {
-    const workbook = XLSX.read(buffer, { type: 'array' });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
+    currentWorkbook = XLSX.read(buffer, { type: 'array' });
+
+    // Show sheet selector
+    const sheetSelect = document.getElementById('sheetSelect');
+    sheetSelect.innerHTML = currentWorkbook.SheetNames.map((name, i) =>
+        `<option value="${i}" ${i === 0 ? 'selected' : ''}>${name}</option>`
+    ).join('');
+
+    if (currentWorkbook.SheetNames.length > 1) {
+        document.getElementById('sheetSelector').style.display = 'flex';
+    } else {
+        document.getElementById('sheetSelector').style.display = 'none';
+    }
+
+    // Load first sheet
+    loadSheet(0);
+}
+
+function onSheetChange() {
+    const idx = parseInt(document.getElementById('sheetSelect').value);
+    loadSheet(idx);
+}
+
+function loadSheet(index) {
+    if (!currentWorkbook) return;
+
+    const sheetName = currentWorkbook.SheetNames[index];
+    const sheet = currentWorkbook.Sheets[sheetName];
     const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
     if (json.length < 2) {
-        alert('Файл пуст или содержит только заголовки.');
+        alert('Лист пуст или содержит только заголовки.');
         return;
     }
 
@@ -129,7 +167,7 @@ function parseExcel(buffer) {
 function onDataLoaded() {
     renderPreview();
     renderColumnMapping();
-    document.getElementById('previewCard').style.display = 'block';
+    document.getElementById('previewCard').style.display = 'flex';
     document.getElementById('columnMapping').style.display = 'block';
 }
 
@@ -138,11 +176,13 @@ function clearFile() {
     fileHeaders = [];
     channelColumns = [];
     journeys = [];
+    currentWorkbook = null;
 
     document.getElementById('uploadInfo').style.display = 'none';
     document.getElementById('previewCard').style.display = 'none';
     document.getElementById('columnMapping').style.display = 'none';
     document.getElementById('resultsSection').style.display = 'none';
+    document.getElementById('sheetSelector').style.display = 'none';
     document.getElementById('fileInput').value = '';
 }
 
@@ -155,10 +195,8 @@ function renderPreview() {
 
     count.textContent = `${uploadedData.length} строк`;
 
-    // Header
     head.innerHTML = '<tr>' + fileHeaders.map(h => `<th>${h}</th>`).join('') + '</tr>';
 
-    // First 10 rows
     const preview = uploadedData.slice(0, 10);
     body.innerHTML = preview.map(row =>
         '<tr>' + fileHeaders.map((_, i) => `<td>${row[i] || ''}</td>`).join('') + '</tr>'
@@ -168,16 +206,14 @@ function renderPreview() {
 // ---- COLUMN MAPPING ----
 
 function renderColumnMapping() {
-    // Client ID dropdown
     const select = document.getElementById('colClientId');
     select.innerHTML = fileHeaders.map((h, i) =>
         `<option value="${i}" ${i === 0 ? 'selected' : ''}>${h}</option>`
     ).join('');
 
-    // Channel columns as checkboxes
     const list = document.getElementById('channelColsList');
     list.innerHTML = fileHeaders.map((h, i) => {
-        if (i === 0) return ''; // Skip first (likely ID)
+        if (i === 0) return '';
         return `
             <label class="channel-col-checkbox">
                 <input type="checkbox" value="${i}" checked>
@@ -196,7 +232,6 @@ function runAnalysis() {
 
     setTimeout(() => {
         try {
-            // Get column mapping
             clientIdColumn = parseInt(document.getElementById('colClientId').value);
             channelColumns = [];
             document.querySelectorAll('#channelColsList input[type="checkbox"]:checked').forEach(cb => {
@@ -208,7 +243,6 @@ function runAnalysis() {
                 return;
             }
 
-            // Build journeys
             buildJourneys();
 
             if (journeys.length === 0) {
@@ -216,14 +250,10 @@ function runAnalysis() {
                 return;
             }
 
-            // Calculate all 4 models
             const allChannels = getUniqueChannels();
             const results = calculateAllModels(allChannels);
-
-            // Get path frequencies
             const topPaths = analyzePathFrequencies();
 
-            // Render everything
             renderSummaryCards(allChannels, topPaths);
             renderAllModelResults(results, allChannels);
             renderComparisonBars(results, allChannels);
@@ -290,7 +320,7 @@ function calculateAllModels(allChannels) {
         const n = path.length;
         if (n === 0) return;
 
-        // --- Weighted ---
+        // Weighted
         const totalScore = n * DEFAULT_SCORE;
         if (totalScore > 0) {
             path.forEach(ch => {
@@ -298,13 +328,13 @@ function calculateAllModels(allChannels) {
             });
         }
 
-        // --- Last Touch ---
+        // Last Touch
         lastTouch[path[n - 1]] = (lastTouch[path[n - 1]] || 0) + 1;
 
-        // --- First Touch ---
+        // First Touch
         firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
 
-        // --- U-Shape ---
+        // U-Shape
         if (n === 1) {
             uShape[path[0]] = (uShape[path[0]] || 0) + 1;
         } else if (n === 2) {
@@ -320,8 +350,6 @@ function calculateAllModels(allChannels) {
         }
     });
 
-    // Convert raw totals to percentages
-    const totalJourneys = journeys.length;
     const toPercent = (obj) => {
         const total = Object.values(obj).reduce((a, b) => a + b, 0);
         const result = {};
@@ -338,7 +366,6 @@ function calculateAllModels(allChannels) {
         uShape: toPercent(uShape),
         lastTouch: toPercent(lastTouch),
         firstTouch: toPercent(firstTouch),
-        // Keep raw for bars
         rawWeighted: weighted,
         rawUShape: uShape,
         rawLastTouch: lastTouch,
@@ -393,6 +420,10 @@ function renderModelResults(attribution, containerId, allChannels) {
 
     container.innerHTML = '';
 
+    // Show top 5 by default
+    const TOP_N = 5;
+    const showBtn = sortedKeys.length > TOP_N;
+
     sortedKeys.forEach((ch, index) => {
         const pct = attribution[ch];
         if (pct <= 0) return;
@@ -402,6 +433,10 @@ function renderModelResults(attribution, containerId, allChannels) {
 
         const el = document.createElement('div');
         el.className = 'result-item';
+        if (index >= TOP_N) {
+            el.classList.add('hidden-result');
+            el.style.display = 'none';
+        }
         el.innerHTML = `
             <div class="result-rank">#${index + 1}</div>
             <div class="result-header">
@@ -414,6 +449,14 @@ function renderModelResults(attribution, containerId, allChannels) {
         `;
         container.appendChild(el);
     });
+
+    // Show/hide expand button
+    const expandBtn = container.closest('.attribution-model').querySelector('.expand-results-btn');
+    if (expandBtn) {
+        expandBtn.style.display = showBtn ? 'block' : 'none';
+        expandBtn.textContent = 'Показать все ▼';
+        expandBtn.dataset.expanded = 'false';
+    }
 }
 
 function renderAllModelResults(results, allChannels) {
@@ -421,6 +464,27 @@ function renderAllModelResults(results, allChannels) {
     renderModelResults(results.uShape, 'uploadUShapeResults', allChannels);
     renderModelResults(results.lastTouch, 'uploadLastTouchResults', allChannels);
     renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels);
+}
+
+function toggleModelExpand(btn) {
+    const targetId = btn.dataset.target;
+    const container = document.getElementById(targetId);
+    const isExpanded = btn.dataset.expanded === 'true';
+
+    const hiddenItems = container.querySelectorAll('.hidden-result');
+
+    if (isExpanded) {
+        hiddenItems.forEach(el => el.style.display = 'none');
+        btn.textContent = 'Показать все ▼';
+        btn.dataset.expanded = 'false';
+        // Scroll container back
+        const scrollContainer = container.closest('.model-results-scroll');
+        if (scrollContainer) scrollContainer.scrollTop = 0;
+    } else {
+        hiddenItems.forEach(el => el.style.display = '');
+        btn.textContent = 'Скрыть ▲';
+        btn.dataset.expanded = 'true';
+    }
 }
 
 function renderComparisonBars(results, allChannels) {
@@ -462,34 +526,67 @@ function renderComparisonBars(results, allChannels) {
 
 function renderScenariosTable(topPaths) {
     const tbody = document.getElementById('uploadTableBody');
+    const expandBtn = document.getElementById('expandTableBtn');
     tbody.innerHTML = '';
 
     const totalCount = journeys.length || 1;
+    const TOP_N = 5;
 
     if (topPaths.length === 0) {
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Нет данных</td></tr>';
+        expandBtn.style.display = 'none';
         return;
     }
 
-    // Show top 20 paths
-    topPaths.slice(0, 20).forEach(item => {
+    topPaths.forEach((item, index) => {
         const pct = ((item.count / totalCount) * 100).toFixed(1);
-        const row = `
-            <tr>
-                <td>${item.path}</td>
-                <td class="col-number" style="width: 110px; text-align: right;"><strong>${item.count}</strong></td>
-                <td class="col-number" style="width: 110px; text-align: right; color:#64748B">${pct}%</td>
-            </tr>
+        const tr = document.createElement('tr');
+        if (index >= TOP_N) {
+            tr.classList.add('hidden-scenario');
+            tr.style.display = 'none';
+        }
+        tr.innerHTML = `
+            <td>${item.path}</td>
+            <td class="col-number" style="width: 110px; text-align: right;"><strong>${item.count}</strong></td>
+            <td class="col-number" style="width: 110px; text-align: right; color:#64748B">${pct}%</td>
         `;
-        tbody.innerHTML += row;
+        tbody.appendChild(tr);
     });
+
+    // Show expand button if more than TOP_N
+    if (topPaths.length > TOP_N) {
+        expandBtn.style.display = 'block';
+        expandBtn.textContent = `Показать все сценарии (${topPaths.length}) ▼`;
+        expandBtn.dataset.expanded = 'false';
+    } else {
+        expandBtn.style.display = 'none';
+    }
+}
+
+function toggleTableExpand() {
+    const btn = document.getElementById('expandTableBtn');
+    const isExpanded = btn.dataset.expanded === 'true';
+    const hiddenRows = document.querySelectorAll('#uploadTableBody .hidden-scenario');
+
+    if (isExpanded) {
+        hiddenRows.forEach(r => r.style.display = 'none');
+        btn.textContent = btn.textContent.replace('▲', '▼').replace('Скрыть', 'Показать все сценарии');
+        btn.dataset.expanded = 'false';
+        // Scroll back to top
+        const scrollContainer = document.querySelector('.scenarios-table-scroll');
+        if (scrollContainer) scrollContainer.scrollTop = 0;
+    } else {
+        hiddenRows.forEach(r => r.style.display = '');
+        const total = document.querySelectorAll('#uploadTableBody tr').length;
+        btn.textContent = `Скрыть (${total}) ▲`;
+        btn.dataset.expanded = 'true';
+    }
 }
 
 function renderInsight(results, allChannels) {
     const container = document.getElementById('uploadInsightText');
     if (!container) return;
 
-    // Find channel with highest U-Shape vs Weighted difference
     let maxDiffChannel = '';
     let maxDiff = 0;
 
@@ -518,7 +615,6 @@ function renderInsight(results, allChannels) {
         text += 'Модели показывают схожие результаты для всех каналов.';
     }
 
-    // Add general stats
     const avgLen = (journeys.reduce((sum, j) => sum + j.path.length, 0) / journeys.length).toFixed(1);
     text += `<br><br>📊 <b>Средняя длина пути:</b> ${avgLen} касаний. `;
 

@@ -5,42 +5,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Загрузка данных — Attribution Calculator</title>
-    <link rel="stylesheet" href="style_v35.css?v=4.0">
-    <link rel="stylesheet" href="upload_style.css?v=1.0">
+    <link rel="stylesheet" href="style_v35.css?v=5.0">
+    <link rel="stylesheet" href="upload_style.css?v=2.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <!-- Navigation -->
-    <nav class="upload-nav">
-        <a href="index.html" class="nav-back-btn">
-            <span>←</span> Калькулятор
-        </a>
-        <div class="nav-title">
-            <span class="nav-icon">📁</span>
-            <h1>Загрузка данных</h1>
+    <!-- Top Nav Bar -->
+    <nav class="top-nav">
+        <div class="top-nav-inner">
+            <a href="index.html" class="nav-tab">
+                <span>⚙️</span> Конструктор
+            </a>
+            <a href="upload.html" class="nav-tab active">
+                <span>📁</span> Загрузка данных
+            </a>
         </div>
-        <div class="nav-spacer"></div>
     </nav>
 
-    <!-- Upload Zone -->
-    <div class="upload-container">
-        <div class="upload-card">
+    <!-- Main Content Card -->
+    <div class="upload-page-wrapper">
+        <div class="upload-main-card">
+            <!-- Header -->
+            <div class="upload-card-header">
+                <div class="header-icon">📁</div>
+                <div>
+                    <h1>Загрузка данных</h1>
+                    <p class="header-subtitle">Загрузите Excel или CSV файл с данными о коммуникациях клиентов</p>
+                </div>
+            </div>
+
+            <div class="header-divider"></div>
+
+            <!-- Drop Zone -->
             <div class="upload-dropzone" id="dropzone">
                 <div class="dropzone-content">
                     <div class="dropzone-icon">📄</div>
-                    <h2>Перетащите файл сюда</h2>
-                    <p>или нажмите для выбора файла</p>
-                    <div class="dropzone-formats">
-                        <span class="format-badge">.xlsx</span>
-                        <span class="format-badge">.csv</span>
-                    </div>
+                    <h2>Перетащите файл сюда или <span class="dropzone-link">выберите файл</span></h2>
+                    <p>Поддерживаются .xlsx, .xls, .csv</p>
                 </div>
                 <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
             </div>
 
+            <!-- File Info -->
             <div class="upload-info" id="uploadInfo" style="display:none;">
                 <div class="file-info">
                     <span class="file-icon">✅</span>
@@ -48,8 +57,14 @@
                         <span class="file-name" id="fileName"></span>
                         <span class="file-meta" id="fileMeta"></span>
                     </div>
-                    <button class="clear-file-btn" id="clearFileBtn">✕</button>
+                    <button class="clear-file-btn" id="clearFileBtn">✕ Удалить</button>
                 </div>
+            </div>
+
+            <!-- Sheet Selector (for Excel) -->
+            <div class="sheet-selector" id="sheetSelector" style="display:none;">
+                <label>Выберите лист:</label>
+                <select id="sheetSelect" class="mapping-select"></select>
             </div>
 
             <!-- Column Mapping -->
@@ -74,7 +89,7 @@
             </div>
         </div>
 
-        <!-- Data Preview -->
+        <!-- Data Preview Card -->
         <div class="preview-card" id="previewCard" style="display:none;">
             <div class="preview-header">
                 <span class="icon">👀</span>
@@ -127,7 +142,12 @@
                         <p class="model-subtitle">Доля = Балл канала / Сумма баллов</p>
                     </div>
                 </div>
-                <div class="results-list" id="uploadWeightedResults"></div>
+                <div class="model-results-scroll">
+                    <div class="results-list" id="uploadWeightedResults"></div>
+                </div>
+                <button class="expand-results-btn" data-target="uploadWeightedResults" style="display:none;">
+                    Показать все ▼
+                </button>
             </div>
 
             <div class="attribution-model">
@@ -138,7 +158,12 @@
                         <p class="model-subtitle">40% Первому / 40% Последнему / 20% Середине</p>
                     </div>
                 </div>
-                <div class="results-list" id="uploadUShapeResults"></div>
+                <div class="model-results-scroll">
+                    <div class="results-list" id="uploadUShapeResults"></div>
+                </div>
+                <button class="expand-results-btn" data-target="uploadUShapeResults" style="display:none;">
+                    Показать все ▼
+                </button>
             </div>
 
             <div class="attribution-model">
@@ -149,7 +174,12 @@
                         <p class="model-subtitle">100% последнему каналу</p>
                     </div>
                 </div>
-                <div class="results-list" id="uploadLastTouchResults"></div>
+                <div class="model-results-scroll">
+                    <div class="results-list" id="uploadLastTouchResults"></div>
+                </div>
+                <button class="expand-results-btn" data-target="uploadLastTouchResults" style="display:none;">
+                    Показать все ▼
+                </button>
             </div>
 
             <div class="attribution-model">
@@ -160,7 +190,12 @@
                         <p class="model-subtitle">100% первому каналу</p>
                     </div>
                 </div>
-                <div class="results-list" id="uploadFirstTouchResults"></div>
+                <div class="model-results-scroll">
+                    <div class="results-list" id="uploadFirstTouchResults"></div>
+                </div>
+                <button class="expand-results-btn" data-target="uploadFirstTouchResults" style="display:none;">
+                    Показать все ▼
+                </button>
             </div>
         </div>
 
@@ -184,16 +219,21 @@
                 <span class="icon">📋</span>
                 <h3>ВСЕ СЦЕНАРИИ (ДЕТАЛИЗАЦИЯ)</h3>
             </div>
-            <table class="sim-table">
-                <thead>
-                    <tr>
-                        <th>Путь</th>
-                        <th class="col-number">КОЛ-ВО</th>
-                        <th class="col-number">ПРОЦЕНТ</th>
-                    </tr>
-                </thead>
-                <tbody id="uploadTableBody"></tbody>
-            </table>
+            <div class="scenarios-table-scroll">
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Путь</th>
+                            <th class="col-number">КОЛ-ВО</th>
+                            <th class="col-number">ПРОЦЕНТ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="uploadTableBody"></tbody>
+                </table>
+            </div>
+            <button class="expand-table-btn" id="expandTableBtn" style="display:none;">
+                Показать все сценарии ▼
+            </button>
         </div>
 
         <!-- Analytical Insight -->
@@ -210,7 +250,7 @@
 
     <!-- SheetJS for Excel parsing -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
-    <script src="upload_script.js"></script>
+    <script src="upload_script.js?v=2.0"></script>
 </body>
 
 </html>
