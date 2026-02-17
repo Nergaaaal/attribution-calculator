@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Загрузка данных - Attribution Calculator</title>
+    <link rel="stylesheet" href="style_v35.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- SheetJS for Excel/CSV parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        .upload-container {
+            max-width: 800px;
+            margin: 40px auto;
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .upload-area {
+            border: 2px dashed #CBD5E0;
+            border-radius: 12px;
+            padding: 40px;
+            margin: 20px 0;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #3B82F6;
+            background: #EFF6FF;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-label {
+            font-size: 18px;
+            color: #4A5568;
+            font-weight: 500;
+        }
+
+        .nav-back {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #64748B;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .nav-back:hover {
+            color: #3B82F6;
+        }
+
+        /* Additional styles for the results section reused from simulation */
+        #uploadResults {
+            margin-top: 40px;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <a href="index.html" class="nav-back">← Вернуться к калькулятору</a>
+
+        <header>
+            <h1>Анализ ваших данных</h1>
+            <p class="subtitle">Загрузите Excel или CSV файл с историей касаний клиентов</p>
+        </header>
+
+        <div class="upload-container">
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <div style="font-size: 48px; margin-bottom: 16px;">📂</div>
+                <div class="upload-label">Нажмите, чтобы выбрать файл</div>
+                <div style="color: #A0AEC0; margin-top: 8px;">.xlsx, .xls, .csv</div>
+            </div>
+            <input type="file" id="fileInput" class="file-input" accept=".xlsx, .xls, .csv">
+
+            <div id="fileInfo" style="margin-top: 20px; font-weight: 600; color: #3B82F6;"></div>
+
+            <button id="processBtn" class="primary-btn" style="margin-top: 20px; display: none; width: 100%;">Рассчитать
+                атрибуцию</button>
+        </div>
+
+        <!-- Hidden by default, shown after processing -->
+        <div id="uploadResults" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Результаты атрибуции (Ваши данные)</h2>
+                </div>
+
+                <div style="margin-bottom: 20px; color: #718096; font-size: 14px;">
+                    Обработано клиентов: <strong id="resClientCount">0</strong> |
+                    Всего касаний: <strong id="resTouchCount">0</strong>
+                </div>
+
+                <!-- Reusing the bar chart visualization -->
+                <div id="resultsBarsContainer"></div>
+
+                <!-- Table for top paths -->
+                <h3 style="margin-top: 32px; margin-bottom: 16px;">Топ-5 цепочек касаний</h3>
+                <table class="sim-table">
+                    <thead>
+                        <tr>
+                            <th>Цепочка каналов</th>
+                            <th style="text-align: right;">Кол-во</th>
+                            <th style="text-align: right;">%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="upload.js"></script>
+</body>
+
+</html>
