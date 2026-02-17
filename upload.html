@@ -4,129 +4,225 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Загрузка данных - Attribution Calculator</title>
+    <title>Загрузка данных — Attribution Calculator</title>
     <link rel="stylesheet" href="style_v35.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- SheetJS for Excel/CSV parsing -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <style>
-        .upload-container {
-            max-width: 800px;
-            margin: 40px auto;
-            text-align: center;
-            background: white;
-            padding: 40px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-        }
-
-        .upload-area {
-            border: 2px dashed #CBD5E0;
-            border-radius: 12px;
-            padding: 40px;
-            margin: 20px 0;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-
-        .upload-area:hover {
-            border-color: #3B82F6;
-            background: #EFF6FF;
-        }
-
-        .file-input {
-            display: none;
-        }
-
-        .upload-label {
-            font-size: 18px;
-            color: #4A5568;
-            font-weight: 500;
-        }
-
-        .nav-back {
-            display: inline-block;
-            margin-bottom: 20px;
-            color: #64748B;
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        .nav-back:hover {
-            color: #3B82F6;
-        }
-
-        /* Additional styles for the results section reused from simulation */
-        #uploadResults {
-            margin-top: 40px;
-            text-align: left;
-        }
-    </style>
 </head>
 
 <body>
+    <!-- Navigation Bar -->
+    <nav class="nav-bar">
+        <a href="index.html" class="nav-link">⚙️ Конструктор</a>
+        <a href="upload.html" class="nav-link active">📁 Загрузка данных</a>
+    </nav>
 
-    <div class="container">
-        <a href="index.html" class="nav-back">← Вернуться к калькулятору</a>
-
-        <header>
-            <h1>Анализ ваших данных</h1>
-            <p class="subtitle">Загрузите Excel или CSV файл с историей касаний клиентов</p>
-        </header>
-
+    <div class="upload-page">
+        <!-- Upload Section -->
         <div class="upload-container">
-            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                <div style="font-size: 48px; margin-bottom: 16px;">📂</div>
-                <div class="upload-label">Нажмите, чтобы выбрать файл</div>
-                <div style="color: #A0AEC0; margin-top: 8px;">.xlsx, .xls, .csv</div>
+            <div class="upload-header">
+                <span class="icon">📁</span>
+                <div>
+                    <h1>Загрузка данных</h1>
+                    <p class="upload-subtitle">Загрузите Excel или CSV файл с данными о коммуникациях клиентов</p>
+                </div>
             </div>
-            <input type="file" id="fileInput" class="file-input" accept=".xlsx, .xls, .csv">
 
-            <div id="fileInfo" style="margin-top: 20px; font-weight: 600; color: #3B82F6;"></div>
+            <!-- Drop Zone -->
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-content">
+                    <div class="drop-icon">📄</div>
+                    <p class="drop-text">Перетащите файл сюда или <label for="fileInput" class="file-label">выберите
+                            файл</label></p>
+                    <p class="drop-hint">Поддерживаются .xlsx, .xls, .csv</p>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
+                </div>
+            </div>
 
-            <button id="processBtn" class="primary-btn" style="margin-top: 20px; display: none; width: 100%;">Рассчитать
-                атрибуцию</button>
+            <!-- File Info (after upload) -->
+            <div class="file-info hidden" id="fileInfo">
+                <div class="file-info-left">
+                    <span class="file-icon">✅</span>
+                    <div>
+                        <div class="file-name" id="fileName">—</div>
+                        <div class="file-meta" id="fileMeta">—</div>
+                    </div>
+                </div>
+                <button class="clear-file-btn" id="clearFileBtn">✕ Удалить</button>
+            </div>
+
+            <!-- Sheet Selector (for multi-sheet Excel) -->
+            <div class="sheet-selector hidden" id="sheetSelector">
+                <label>Выберите лист:</label>
+                <select id="sheetSelect"></select>
+            </div>
+
+            <!-- Column Mapping -->
+            <div class="column-mapping hidden" id="columnMapping">
+                <div class="section-header">
+                    <span class="icon">🔗</span>
+                    <h2>Маппинг колонок</h2>
+                </div>
+                <p class="mapping-hint">Укажите, какие колонки в вашем файле соответствуют нужным полям</p>
+                <div class="mapping-grid">
+                    <div class="mapping-item">
+                        <label>🆔 ID Клиента</label>
+                        <select id="mapClientId"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>📡 Канал коммуникации</label>
+                        <select id="mapChannel"></select>
+                    </div>
+                    <div class="mapping-item">
+                        <label>🕐 Дата / Время</label>
+                        <select id="mapTimestamp"></select>
+                    </div>
+                </div>
+                <button class="process-btn" id="processBtn">
+                    <span class="arrow">▶</span> Рассчитать атрибуцию
+                </button>
+            </div>
+
+            <!-- Data Preview -->
+            <div class="data-preview hidden" id="dataPreview">
+                <div class="section-header">
+                    <span class="icon">👁️</span>
+                    <h2>Предпросмотр данных</h2>
+                    <span class="preview-badge" id="previewBadge">Первые 10 строк</span>
+                </div>
+                <div class="preview-table-wrapper">
+                    <table class="preview-table" id="previewTable">
+                        <thead id="previewHead"></thead>
+                        <tbody id="previewBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
-        <!-- Hidden by default, shown after processing -->
-        <div id="uploadResults" class="hidden">
-            <div class="card">
-                <div class="card-header">
-                    <h2>Результаты атрибуции (Ваши данные)</h2>
+        <!-- Results Section (hidden until processed) -->
+        <div class="upload-results hidden" id="uploadResults">
+            <!-- Summary Cards -->
+            <div class="sim-cards-grid">
+                <div class="sim-card">
+                    <div class="card-label">ВСЕГО КЛИЕНТОВ</div>
+                    <div class="card-value" id="upTotalClients">—</div>
+                    <div class="card-sub text-gray" id="upTotalClientsSub">уникальных ID</div>
+                </div>
+                <div class="sim-card">
+                    <div class="card-label">ВСЕГО КАСАНИЙ</div>
+                    <div class="card-value" id="upTotalTouches">—</div>
+                    <div class="card-sub text-gray" id="upTotalTouchesSub">строк в файле</div>
+                </div>
+                <div class="sim-card">
+                    <div class="card-label">СРЕДНЯЯ ДЛИНА ПУТИ</div>
+                    <div class="card-value" id="upAvgLength">—</div>
+                    <div class="card-sub text-gray">касаний на клиента</div>
+                </div>
+                <div class="sim-card">
+                    <div class="card-label">САМЫЙ ЧАСТЫЙ ПУТЬ</div>
+                    <div class="card-value sm" id="upTopPath">—</div>
+                    <div class="card-sub text-gray" id="upTopPathPercent">—</div>
+                </div>
+            </div>
+
+            <!-- 4 Model Results -->
+            <div class="upload-models-grid">
+                <!-- Weighted Score -->
+                <div class="attribution-model">
+                    <div class="model-header">
+                        <span class="icon-bar">📊</span>
+                        <div>
+                            <h3>Weighted Score</h3>
+                            <p class="model-subtitle">Доля = Балл канала / Сумма баллов</p>
+                        </div>
+                    </div>
+                    <div class="results-list" id="upWeightedResults"></div>
                 </div>
 
-                <div style="margin-bottom: 20px; color: #718096; font-size: 14px;">
-                    Обработано клиентов: <strong id="resClientCount">0</strong> |
-                    Всего касаний: <strong id="resTouchCount">0</strong>
+                <!-- U-Shape -->
+                <div class="attribution-model">
+                    <div class="model-header">
+                        <span class="icon-bar">🏔️</span>
+                        <div>
+                            <h3>U-Shape (Position Based)</h3>
+                            <p class="model-subtitle">40% Первому / 40% Последнему / 20% Середине</p>
+                        </div>
+                    </div>
+                    <div class="results-list" id="upUShapeResults"></div>
                 </div>
 
-                <!-- Reusing the bar chart visualization -->
-                <div id="resultsBarsContainer"></div>
+                <!-- Last Touch -->
+                <div class="attribution-model">
+                    <div class="model-header">
+                        <span class="icon-bar">👆</span>
+                        <div>
+                            <h3>Last Touch</h3>
+                            <p class="model-subtitle">100% последнему каналу</p>
+                        </div>
+                    </div>
+                    <div class="results-list" id="upLastTouchResults"></div>
+                </div>
 
-                <!-- Table for top paths -->
-                <h3 style="margin-top: 32px; margin-bottom: 16px;">Топ-5 цепочек касаний</h3>
+                <!-- First Touch -->
+                <div class="attribution-model">
+                    <div class="model-header">
+                        <span class="icon-bar">🎯</span>
+                        <div>
+                            <h3>First Touch</h3>
+                            <p class="model-subtitle">100% первому каналу</p>
+                        </div>
+                    </div>
+                    <div class="results-list" id="upFirstTouchResults"></div>
+                </div>
+            </div>
+
+            <!-- Comparison Bars -->
+            <div class="sim-chart-section">
+                <div class="section-title">
+                    <span class="icon-bar">📊</span> Распределение вклада (Атрибуция продаж)
+                </div>
+                <div id="upBarsContainer" class="sim-bars-container"></div>
+                <div class="sim-legend">
+                    <div class="legend-item"><span class="dot l-gray"></span> Last Touch</div>
+                    <div class="legend-item"><span class="dot l-green"></span> Weighted Score</div>
+                    <div class="legend-item"><span class="dot l-blue"></span> U-Shape</div>
+                    <div class="legend-item"><span class="dot l-orange"></span> First Touch</div>
+                </div>
+            </div>
+
+            <!-- Scenarios Table -->
+            <div class="sim-table-section">
+                <div class="section-title">
+                    <span class="icon">📋</span>
+                    <h3>ВСЕ СЦЕНАРИИ (ДЕТАЛИЗАЦИЯ)</h3>
+                </div>
                 <table class="sim-table">
                     <thead>
                         <tr>
-                            <th>Цепочка каналов</th>
-                            <th style="text-align: right;">Кол-во</th>
-                            <th style="text-align: right;">%</th>
+                            <th>Путь</th>
+                            <th class="col-number">КОЛ-ВО</th>
+                            <th class="col-number">ПРОЦЕНТ</th>
                         </tr>
                     </thead>
-                    <tbody id="resultsTableBody"></tbody>
+                    <tbody id="upTableBody"></tbody>
                 </table>
+            </div>
+
+            <!-- Analytical Insight -->
+            <div class="sim-insight-section">
+                <div class="insight-icon">💡</div>
+                <div class="insight-content">
+                    <h3>Аналитический вывод</h3>
+                    <div id="upInsightText">—</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="upload.js"></script>
+    <!-- SheetJS for Excel/CSV parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script src="upload_script.js"></script>
 </body>
 
 </html>
