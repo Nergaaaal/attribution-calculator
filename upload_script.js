@@ -55,14 +55,6 @@ function init() {
 
     // Sheet selector
     document.getElementById('sheetSelect').addEventListener('change', onSheetChange);
-
-    // Expand table button
-    document.getElementById('expandTableBtn').addEventListener('click', toggleTableExpand);
-
-    // Expand model buttons
-    document.querySelectorAll('.expand-results-btn').forEach(btn => {
-        btn.addEventListener('click', () => toggleModelExpand(btn));
-    });
 }
 
 // ---- FILE HANDLING ----
@@ -439,9 +431,6 @@ function renderModelResults(attribution, containerId, allChannels) {
 
     container.innerHTML = '';
 
-    const TOP_N = 5;
-    const showBtn = sortedKeys.length > TOP_N;
-
     sortedKeys.forEach((ch, index) => {
         const pct = attribution[ch];
         if (pct <= 0) return;
@@ -451,10 +440,6 @@ function renderModelResults(attribution, containerId, allChannels) {
 
         const el = document.createElement('div');
         el.className = 'result-item';
-        if (index >= TOP_N) {
-            el.classList.add('hidden-result');
-            el.style.display = 'none';
-        }
         el.innerHTML = `
             <div class="result-rank">#${index + 1}</div>
             <div class="result-header">
@@ -467,13 +452,6 @@ function renderModelResults(attribution, containerId, allChannels) {
         `;
         container.appendChild(el);
     });
-
-    const expandBtn = container.closest('.attribution-model').querySelector('.expand-results-btn');
-    if (expandBtn) {
-        expandBtn.style.display = showBtn ? 'block' : 'none';
-        expandBtn.textContent = 'Показать все ▼';
-        expandBtn.dataset.expanded = 'false';
-    }
 }
 
 function renderAllModelResults(results, allChannels) {
@@ -483,25 +461,8 @@ function renderAllModelResults(results, allChannels) {
     renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels);
 }
 
-function toggleModelExpand(btn) {
-    const targetId = btn.dataset.target;
-    const container = document.getElementById(targetId);
-    const isExpanded = btn.dataset.expanded === 'true';
+function toggleModelExpand(btn) { }
 
-    const hiddenItems = container.querySelectorAll('.hidden-result');
-
-    if (isExpanded) {
-        hiddenItems.forEach(el => el.style.display = 'none');
-        btn.textContent = 'Показать все ▼';
-        btn.dataset.expanded = 'false';
-        const scrollContainer = container.closest('.model-results-scroll');
-        if (scrollContainer) scrollContainer.scrollTop = 0;
-    } else {
-        hiddenItems.forEach(el => el.style.display = '');
-        btn.textContent = 'Скрыть ▲';
-        btn.dataset.expanded = 'true';
-    }
-}
 
 function renderComparisonBars(results, allChannels) {
     const container = document.getElementById('uploadBarsContainer');
@@ -546,21 +507,15 @@ function renderScenariosTable(topPaths) {
     tbody.innerHTML = '';
 
     const totalCount = journeys.length || 1;
-    const TOP_N = 5;
 
     if (topPaths.length === 0) {
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Нет данных</td></tr>';
-        expandBtn.style.display = 'none';
         return;
     }
 
     topPaths.forEach((item, index) => {
         const pct = ((item.count / totalCount) * 100).toFixed(1);
         const tr = document.createElement('tr');
-        if (index >= TOP_N) {
-            tr.classList.add('hidden-scenario');
-            tr.style.display = 'none';
-        }
         tr.innerHTML = `
             <td>${item.path}</td>
             <td class="col-number" style="width: 110px; text-align: right;"><strong>${item.count}</strong></td>
@@ -568,34 +523,10 @@ function renderScenariosTable(topPaths) {
         `;
         tbody.appendChild(tr);
     });
-
-    if (topPaths.length > TOP_N) {
-        expandBtn.style.display = 'block';
-        expandBtn.textContent = `Показать все сценарии (${topPaths.length}) ▼`;
-        expandBtn.dataset.expanded = 'false';
-    } else {
-        expandBtn.style.display = 'none';
-    }
 }
 
-function toggleTableExpand() {
-    const btn = document.getElementById('expandTableBtn');
-    const isExpanded = btn.dataset.expanded === 'true';
-    const hiddenRows = document.querySelectorAll('#uploadTableBody .hidden-scenario');
+function toggleTableExpand() { }
 
-    if (isExpanded) {
-        hiddenRows.forEach(r => r.style.display = 'none');
-        btn.textContent = btn.textContent.replace('▲', '▼').replace('Скрыть', 'Показать все сценарии');
-        btn.dataset.expanded = 'false';
-        const scrollContainer = document.querySelector('.scenarios-table-scroll');
-        if (scrollContainer) scrollContainer.scrollTop = 0;
-    } else {
-        hiddenRows.forEach(r => r.style.display = '');
-        const total = document.querySelectorAll('#uploadTableBody tr').length;
-        btn.textContent = `Скрыть (${total}) ▲`;
-        btn.dataset.expanded = 'true';
-    }
-}
 
 function renderInsight(results, allChannels) {
     const container = document.getElementById('uploadInsightText');

@@ -55,9 +55,9 @@
 
 /* ---- PAGE WRAPPER (single column) ---- */
 .upload-page-wrapper {
-    max-width: 960px;
+    max-width: 1400px;
     margin: 32px auto;
-    padding: 0 24px;
+    padding: 0 32px;
     display: flex;
     flex-direction: column;
     gap: 24px;
@@ -428,9 +428,9 @@
 
 /* ---- RESULTS SECTION ---- */
 .upload-results-section {
-    max-width: 960px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 0 24px 48px;
+    padding: 0 32px 48px;
 }
 
 .upload-models-grid {
@@ -448,45 +448,18 @@
 
 /* Scrollable model results */
 .model-results-scroll {
-    max-height: 280px;
+    max-height: 350px;
     overflow-y: auto;
-    transition: max-height 0.4s ease;
 }
 
-.model-results-scroll.expanded {
-    max-height: none;
-}
 
-.expand-results-btn {
-    width: 100%;
-    background: #F8FAFC;
-    border: 1px solid #E2E8F0;
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #667eea;
-    cursor: pointer;
-    margin-top: 8px;
-    transition: all 0.2s;
-    font-family: 'Inter', sans-serif;
-}
-
-.expand-results-btn:hover {
-    background: #EFF6FF;
-    border-color: #667eea;
-}
 
 /* Scrollable scenarios table */
 .scenarios-table-scroll {
-    max-height: 300px;
+    max-height: 400px;
     overflow-y: auto;
     border-radius: 10px;
     border: 1px solid #E2E8F0;
-}
-
-.scenarios-table-scroll.expanded {
-    max-height: none;
 }
 
 .scenarios-table-scroll .sim-table {
@@ -494,25 +467,7 @@
     border: none;
 }
 
-.expand-table-btn {
-    width: 100%;
-    background: #F8FAFC;
-    border: 1px solid #E2E8F0;
-    border-radius: 8px;
-    padding: 10px 16px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #667eea;
-    cursor: pointer;
-    margin-top: 12px;
-    transition: all 0.2s;
-    font-family: 'Inter', sans-serif;
-}
 
-.expand-table-btn:hover {
-    background: #EFF6FF;
-    border-color: #667eea;
-}
 
 /* Purple fill for comparison bars */
 .fill-purple {
