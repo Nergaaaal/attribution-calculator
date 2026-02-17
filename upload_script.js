@@ -397,11 +397,15 @@ function calculateAllModels(allChannels) {
             });
         }
 
-        // ---- Last Touch: 100% to last channel ----
-        lastTouch[path[n - 1]] = (lastTouch[path[n - 1]] || 0) + 1;
+        // ---- Last Touch: count last channel per journey ----
+        const lastCh = path[n - 1];
+        if (!lastTouch._counts) lastTouch._counts = {};
+        lastTouch._counts[lastCh] = (lastTouch._counts[lastCh] || 0) + 1;
 
-        // ---- First Touch: 100% to first channel ----
-        firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
+        // ---- First Touch: count first channel per journey ----
+        const firstCh = path[0];
+        if (!firstTouch._counts) firstTouch._counts = {};
+        firstTouch._counts[firstCh] = (firstTouch._counts[firstCh] || 0) + 1;
 
         // ---- U-Shape: only for 2+ touchpoints ----
         // Single-touch journeys are excluded — U-Shape is position-based
@@ -431,15 +435,41 @@ function calculateAllModels(allChannels) {
         return result;
     };
 
+    // Last Touch: 100% to the single most frequent last channel
+    const lastCounts = lastTouch._counts || {};
+    let maxLastCh = null, maxLastCount = 0;
+    Object.keys(lastCounts).forEach(ch => {
+        if (lastCounts[ch] > maxLastCount) {
+            maxLastCount = lastCounts[ch];
+            maxLastCh = ch;
+        }
+    });
+    const lastTouchResult = {};
+    allChannels.forEach(ch => lastTouchResult[ch] = 0);
+    if (maxLastCh) lastTouchResult[maxLastCh] = 100;
+
+    // First Touch: 100% to the single most frequent first channel
+    const firstCounts = firstTouch._counts || {};
+    let maxFirstCh = null, maxFirstCount = 0;
+    Object.keys(firstCounts).forEach(ch => {
+        if (firstCounts[ch] > maxFirstCount) {
+            maxFirstCount = firstCounts[ch];
+            maxFirstCh = ch;
+        }
+    });
+    const firstTouchResult = {};
+    allChannels.forEach(ch => firstTouchResult[ch] = 0);
+    if (maxFirstCh) firstTouchResult[maxFirstCh] = 100;
+
     return {
         weighted: toPercent(weighted),
         uShape: toPercent(uShape),
-        lastTouch: toPercent(lastTouch),
-        firstTouch: toPercent(firstTouch),
+        lastTouch: lastTouchResult,
+        firstTouch: firstTouchResult,
         rawWeighted: weighted,
         rawUShape: uShape,
-        rawLastTouch: lastTouch,
-        rawFirstTouch: firstTouch
+        rawLastTouch: lastCounts,
+        rawFirstTouch: firstCounts
     };
 }
 
