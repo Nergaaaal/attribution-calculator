@@ -55,7 +55,7 @@
 
 /* ---- PAGE WRAPPER (single column) ---- */
 .upload-page-wrapper {
-    max-width: 1100px;
+    max-width: 1200px;
     margin: 32px auto;
     padding: 0 32px;
     display: flex;
@@ -133,21 +133,22 @@
 }
 
 .clear-file-btn {
-    padding: 6px 16px;
-    border-radius: 8px;
-    border: 1px solid #FCA5A5;
-    background: #FEF2F2;
-    color: #DC2626;
-    font-size: 13px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    background: white;
+    color: #EF4444;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
+    font-family: 'Inter', sans-serif;
 }
 
 .clear-file-btn:hover {
-    background: #FEE2E2;
-    border-color: #EF4444;
+    background: #FEF2F2;
+    border-color: #FCA5A5;
 }
 
 /* ---- SHEET SELECTOR ---- */
@@ -428,7 +429,7 @@
 
 /* ---- RESULTS SECTION ---- */
 .upload-results-section {
-    max-width: 1400px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 0 32px 48px;
 }
