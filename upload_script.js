@@ -397,15 +397,11 @@ function calculateAllModels(allChannels) {
             });
         }
 
-        // ---- Last Touch: count last channel per journey ----
-        const lastCh = path[n - 1];
-        if (!lastTouch._counts) lastTouch._counts = {};
-        lastTouch._counts[lastCh] = (lastTouch._counts[lastCh] || 0) + 1;
+        // ---- Last Touch: 100% to last channel ----
+        lastTouch[path[n - 1]] = (lastTouch[path[n - 1]] || 0) + 1;
 
-        // ---- First Touch: count first channel per journey ----
-        const firstCh = path[0];
-        if (!firstTouch._counts) firstTouch._counts = {};
-        firstTouch._counts[firstCh] = (firstTouch._counts[firstCh] || 0) + 1;
+        // ---- First Touch: 100% to first channel ----
+        firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
 
         // ---- U-Shape: only for 2+ touchpoints ----
         // Single-touch journeys are excluded — U-Shape is position-based
@@ -435,41 +431,16 @@ function calculateAllModels(allChannels) {
         return result;
     };
 
-    // Last Touch: 100% to the single most frequent last channel
-    const lastCounts = lastTouch._counts || {};
-    let maxLastCh = null, maxLastCount = 0;
-    Object.keys(lastCounts).forEach(ch => {
-        if (lastCounts[ch] > maxLastCount) {
-            maxLastCount = lastCounts[ch];
-            maxLastCh = ch;
-        }
-    });
-    const lastTouchResult = {};
-    allChannels.forEach(ch => lastTouchResult[ch] = 0);
-    if (maxLastCh) lastTouchResult[maxLastCh] = 100;
-
-    // First Touch: 100% to the single most frequent first channel
-    const firstCounts = firstTouch._counts || {};
-    let maxFirstCh = null, maxFirstCount = 0;
-    Object.keys(firstCounts).forEach(ch => {
-        if (firstCounts[ch] > maxFirstCount) {
-            maxFirstCount = firstCounts[ch];
-            maxFirstCh = ch;
-        }
-    });
-    const firstTouchResult = {};
-    allChannels.forEach(ch => firstTouchResult[ch] = 0);
-    if (maxFirstCh) firstTouchResult[maxFirstCh] = 100;
-
     return {
         weighted: toPercent(weighted),
         uShape: toPercent(uShape),
-        lastTouch: lastTouchResult,
-        firstTouch: firstTouchResult,
+        lastTouch: toPercent(lastTouch),
+        firstTouch: toPercent(firstTouch),
         rawWeighted: weighted,
         rawUShape: uShape,
-        rawLastTouch: lastCounts,
-        rawFirstTouch: firstCounts
+        rawLastTouch: lastTouch,
+        rawFirstTouch: firstTouch,
+        uShapePositional: calculateUShapePositional(allChannels)
     };
 }
 
@@ -483,6 +454,49 @@ function analyzePathFrequencies() {
     return Object.keys(counts)
         .map(key => ({ path: key, count: counts[key] }))
         .sort((a, b) => b.count - a.count);
+}
+
+function calculateUShapePositional(allChannels) {
+    const firstPos = {};
+    const middlePos = {};
+    const lastPos = {};
+    let multiTouchCount = 0;
+
+    allChannels.forEach(ch => {
+        firstPos[ch] = 0;
+        middlePos[ch] = 0;
+        lastPos[ch] = 0;
+    });
+
+    journeys.forEach(j => {
+        const path = j.path;
+        const n = path.length;
+        if (n < 2) return;
+
+        multiTouchCount++;
+        firstPos[path[0]] = (firstPos[path[0]] || 0) + 1;
+        lastPos[path[n - 1]] = (lastPos[path[n - 1]] || 0) + 1;
+
+        for (let k = 1; k < n - 1; k++) {
+            middlePos[path[k]] = (middlePos[path[k]] || 0) + 1;
+        }
+    });
+
+    const toPercent = (obj) => {
+        const total = Object.values(obj).reduce((a, b) => a + b, 0);
+        const result = {};
+        Object.keys(obj).forEach(k => {
+            result[k] = total > 0 ? (obj[k] / total) * 100 : 0;
+        });
+        return result;
+    };
+
+    return {
+        first: toPercent(firstPos),
+        middle: toPercent(middlePos),
+        last: toPercent(lastPos),
+        multiTouchCount
+    };
 }
 
 // ---- RENDERING ----
@@ -544,9 +558,69 @@ function renderModelResults(attribution, containerId, allChannels) {
 
 function renderAllModelResults(results, allChannels) {
     renderModelResults(results.weighted, 'uploadWeightedResults', allChannels);
-    renderModelResults(results.uShape, 'uploadUShapeResults', allChannels);
+    renderUShapePositional(results.uShapePositional, 'uploadUShapeResults', allChannels);
     renderModelResults(results.lastTouch, 'uploadLastTouchResults', allChannels);
     renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels);
+}
+
+function renderUShapePositional(positional, containerId, allChannels) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (positional.multiTouchCount === 0) {
+        container.innerHTML = '<div class="sim-empty-state"><div class="empty-icon">📊</div><div class="empty-text">Нет клиентов с 2+ касаниями</div></div>';
+        return;
+    }
+
+    container.innerHTML = '';
+
+    const sections = [
+        { label: '🥇 Первый контакт', weight: '40%', data: positional.first },
+        { label: '🔄 Средние контакты', weight: '20%', data: positional.middle },
+        { label: '🏁 Последний контакт', weight: '40%', data: positional.last }
+    ];
+
+    sections.forEach(section => {
+        const sectionEl = document.createElement('div');
+        sectionEl.className = 'ushape-position-section';
+
+        const headerEl = document.createElement('div');
+        headerEl.className = 'ushape-position-header';
+        headerEl.innerHTML = `<span>${section.label}</span><span class="ushape-weight">${section.weight}</span>`;
+        sectionEl.appendChild(headerEl);
+
+        const sortedChannels = Object.keys(section.data)
+            .filter(ch => section.data[ch] > 0)
+            .sort((a, b) => section.data[b] - section.data[a]);
+
+        if (sortedChannels.length === 0) {
+            const emptyEl = document.createElement('div');
+            emptyEl.className = 'ushape-empty';
+            emptyEl.textContent = 'Нет данных';
+            sectionEl.appendChild(emptyEl);
+        } else {
+            sortedChannels.forEach((ch, index) => {
+                const pct = section.data[ch];
+                const colorIdx = allChannels.indexOf(ch);
+                const color = getChannelColor(colorIdx);
+
+                const el = document.createElement('div');
+                el.className = 'result-item';
+                el.innerHTML = `
+                    <div class="result-header">
+                        <span class="result-channel-name">${ch}</span>
+                    </div>
+                    <div class="result-percent">${pct.toFixed(1)}%</div>
+                    <div class="result-bar-container">
+                        <div class="result-bar" style="width: ${pct}%; background-color: ${color};"></div>
+                    </div>
+                `;
+                sectionEl.appendChild(el);
+            });
+        }
+
+        container.appendChild(sectionEl);
+    });
 }
 
 function renderComparisonBars(results, allChannels) {
