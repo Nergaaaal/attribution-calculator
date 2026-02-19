@@ -470,13 +470,7 @@ function runAnalysis() {
         try {
             buildJourneys();
 
-            if (journeys.length === 0) {
-                hideProgress();
-                alert('Не удалось построить пути клиентов. Проверьте, что CLI_CODE/CLIENT_CD совпадают между cash_loan и листами каналов.\n\nКлиентов в cash_loan: ' + cashLoanData.length + '\nСобытий каналов: ' + channelEvents.length);
-                return;
-            }
-
-            showProgress('Расчёт моделей атрибуции...', 92);
+            showProgress('Анализ сценариев...', 92);
 
             setTimeout(() => {
                 const allChannels = getUniqueChannels();
@@ -485,14 +479,25 @@ function runAnalysis() {
                     if (channelScores[ch] === undefined) channelScores[ch] = DEFAULT_SCORE;
                 });
 
-                const results = calculateAllModels(allChannels);
                 const topPaths = analyzePathFrequencies();
+                const organicCount = countOrganicClients();
 
-                renderSummaryCards(allChannels, topPaths);
-                renderAllModelResults(results, allChannels);
-                renderComparisonBars(results, allChannels);
-                renderScenariosTable(topPaths);
-                renderInsight(results, allChannels);
+                // Summary cards
+                renderSummaryCards(topPaths, organicCount);
+
+                // Top scenarios with attribution breakdown
+                renderTopScenarios(topPaths, organicCount);
+
+                // Aggregate models (Weighted + U-Shape)
+                const results = calculateAggregateModels(allChannels);
+                renderModelResults(results.weighted, 'uploadWeightedResults', allChannels);
+                renderModelResults(results.uShape, 'uploadUShapeResults', allChannels);
+
+                // Scenarios table (all paths + Organic)
+                renderScenariosTable(topPaths, organicCount);
+
+                // Insight
+                renderInsight(results, allChannels, organicCount);
 
                 hideProgress();
 
@@ -537,7 +542,7 @@ function buildJourneys() {
         matchCount++;
         const dtOpen = loanMap[evt.cliCode];
 
-        if (evt.date >= dtOpen) return; // event AFTER loan, skip
+        if (evt.date >= dtOpen) return; // event AFTER loan → skip
 
         beforeCount++;
         if (!clientEvents[evt.cliCode]) clientEvents[evt.cliCode] = [];
@@ -570,19 +575,90 @@ function getUniqueChannels() {
     return Array.from(set);
 }
 
+function countOrganicClients() {
+    // Unique loan clients
+    const loanClients = new Set();
+    cashLoanData.forEach(l => loanClients.add(l.cliCode));
+
+    // Clients with journeys
+    const journeyClients = new Set();
+    journeys.forEach(j => journeyClients.add(j.clientId));
+
+    return loanClients.size - journeyClients.size;
+}
+
+// ---- PATH ANALYSIS ----
+
+function analyzePathFrequencies() {
+    const counts = {};
+    journeys.forEach(j => {
+        const key = j.path.join(' → ');
+        counts[key] = (counts[key] || 0) + 1;
+    });
+
+    return Object.keys(counts)
+        .map(key => ({
+            path: key,
+            channels: key.split(' → '),
+            count: counts[key]
+        }))
+        .sort((a, b) => b.count - a.count);
+}
+
 // ---- ATTRIBUTION CALCULATIONS ----
 
-function calculateAllModels(allChannels) {
+function calculateScenarioWeighted(channels) {
+    // Calculate Weighted Score for a single scenario/path
+    const result = {};
+    let totalScore = 0;
+
+    channels.forEach(ch => {
+        const s = channelScores[ch] !== undefined ? channelScores[ch] : DEFAULT_SCORE;
+        totalScore += s;
+    });
+
+    if (totalScore === 0) return result;
+
+    channels.forEach(ch => {
+        const s = channelScores[ch] !== undefined ? channelScores[ch] : DEFAULT_SCORE;
+        const pct = (s / totalScore) * 100;
+        result[ch] = (result[ch] || 0) + pct;
+    });
+
+    return result;
+}
+
+function calculateScenarioUShape(channels) {
+    // Calculate U-Shape for a single scenario/path
+    const result = {};
+    const n = channels.length;
+
+    if (n === 1) {
+        result[channels[0]] = 100;
+    } else if (n === 2) {
+        result[channels[0]] = (result[channels[0]] || 0) + 50;
+        result[channels[1]] = (result[channels[1]] || 0) + 50;
+    } else {
+        // 40% first, 40% last, 20% split among middle
+        result[channels[0]] = (result[channels[0]] || 0) + 40;
+        result[channels[n - 1]] = (result[channels[n - 1]] || 0) + 40;
+        const midPct = 20 / (n - 2);
+        for (let k = 1; k < n - 1; k++) {
+            result[channels[k]] = (result[channels[k]] || 0) + midPct;
+        }
+    }
+
+    return result;
+}
+
+function calculateAggregateModels(allChannels) {
+    // Aggregate across ALL journeys
     const weighted = {};
     const uShape = {};
-    const lastTouch = {};
-    const firstTouch = {};
 
     allChannels.forEach(ch => {
         weighted[ch] = 0;
         uShape[ch] = 0;
-        lastTouch[ch] = 0;
-        firstTouch[ch] = 0;
     });
 
     journeys.forEach(j => {
@@ -604,13 +680,7 @@ function calculateAllModels(allChannels) {
             });
         }
 
-        // Last Touch
-        lastTouch[path[n - 1]] = (lastTouch[path[n - 1]] || 0) + 1;
-
-        // First Touch
-        firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
-
-        // U-Shape: 40% first, 40% last, 20% middle
+        // U-Shape
         if (n === 1) {
             uShape[path[0]] = (uShape[path[0]] || 0) + 1;
         } else if (n === 2) {
@@ -639,26 +709,8 @@ function calculateAllModels(allChannels) {
 
     return {
         weighted: toPercent(weighted),
-        uShape: toPercent(uShape),
-        lastTouch: toPercent(lastTouch),
-        firstTouch: toPercent(firstTouch),
-        rawWeighted: weighted,
-        rawUShape: uShape,
-        rawLastTouch: lastTouch,
-        rawFirstTouch: firstTouch
+        uShape: toPercent(uShape)
     };
-}
-
-function analyzePathFrequencies() {
-    const counts = {};
-    journeys.forEach(j => {
-        const key = j.path.join(' → ');
-        counts[key] = (counts[key] || 0) + 1;
-    });
-
-    return Object.keys(counts)
-        .map(key => ({ path: key, count: counts[key] }))
-        .sort((a, b) => b.count - a.count);
 }
 
 // ---- RENDERING ----
@@ -671,20 +723,151 @@ function getChannelLabel(ch) {
     return CHANNEL_CONFIG[ch] ? CHANNEL_CONFIG[ch].label : ch;
 }
 
-function renderSummaryCards(allChannels, topPaths) {
-    document.getElementById('rTotalClients').textContent = journeys.length.toLocaleString();
-    document.getElementById('rTotalClientsSub').textContent = `${topPaths.length} уникальных путей`;
-    document.getElementById('rUniqueChannels').textContent = allChannels.length;
-    document.getElementById('rChannelsList').textContent = allChannels.map(ch => getChannelLabel(ch)).slice(0, 4).join(', ') + (allChannels.length > 4 ? '...' : '');
+function renderSummaryCards(topPaths, organicCount) {
+    // Unique loan clients
+    const loanClients = new Set();
+    cashLoanData.forEach(l => loanClients.add(l.cliCode));
+    const totalSales = loanClients.size;
 
+    // Card 1: Total Sales
+    document.getElementById('rTotalSales').textContent = totalSales.toLocaleString();
+    document.getElementById('rTotalSalesSub').textContent = 'оформленных кредитов';
+
+    // Card 2: With Communications
+    const withComms = journeys.length;
+    const commsPct = ((withComms / totalSales) * 100).toFixed(1);
+    document.getElementById('rWithComms').textContent = withComms.toLocaleString();
+    document.getElementById('rWithCommsSub').textContent = `${commsPct}% от всех продаж · Organic: ${organicCount.toLocaleString()}`;
+
+    // Card 3: Top Path
     if (topPaths.length > 0) {
         document.getElementById('rTopPath').textContent = topPaths[0].path;
-        const pct = ((topPaths[0].count / journeys.length) * 100).toFixed(1);
-        document.getElementById('rTopPathPercent').textContent = `${pct}% от всех клиентов`;
+        const pct = ((topPaths[0].count / totalSales) * 100).toFixed(1);
+        document.getElementById('rTopPathPercent').textContent = `${topPaths[0].count.toLocaleString()} клиентов (${pct}%)`;
     }
 
-    const avgLen = journeys.reduce((sum, j) => sum + j.path.length, 0) / journeys.length;
-    document.getElementById('rAvgLength').textContent = avgLen.toFixed(1);
+    // Card 4: Avg Path Length
+    if (journeys.length > 0) {
+        const avgLen = journeys.reduce((sum, j) => sum + j.path.length, 0) / journeys.length;
+        document.getElementById('rAvgLength').textContent = avgLen.toFixed(1);
+    } else {
+        document.getElementById('rAvgLength').textContent = '—';
+    }
+}
+
+function renderTopScenarios(topPaths, organicCount) {
+    const container = document.getElementById('topScenariosContainer');
+    container.innerHTML = '';
+
+    if (topPaths.length === 0 && organicCount === 0) {
+        container.innerHTML = '<div style="text-align:center;color:#94A3B8;padding:20px;">Нет данных</div>';
+        return;
+    }
+
+    const loanClients = new Set();
+    cashLoanData.forEach(l => loanClients.add(l.cliCode));
+    const totalSales = loanClients.size;
+
+    // Show Organic first
+    if (organicCount > 0) {
+        const organicPct = ((organicCount / totalSales) * 100).toFixed(1);
+        const organicCard = document.createElement('div');
+        organicCard.className = 'scenario-card organic-card';
+        organicCard.innerHTML = `
+            <div class="scenario-header">
+                <div class="scenario-path">
+                    <span class="scenario-badge organic-badge">🌿 Organic</span>
+                    <span class="scenario-desc">Без коммуникаций до выдачи</span>
+                </div>
+                <div class="scenario-stats">
+                    <span class="scenario-count">${organicCount.toLocaleString()}</span>
+                    <span class="scenario-pct">${organicPct}%</span>
+                </div>
+            </div>
+            <div class="scenario-note">Не включены в модели атрибуции</div>
+        `;
+        container.appendChild(organicCard);
+    }
+
+    // Show top 10 communication paths
+    const top = topPaths.slice(0, 10);
+    top.forEach((item, index) => {
+        const pct = ((item.count / totalSales) * 100).toFixed(1);
+        const channels = item.channels;
+
+        // Calculate U-Shape for this scenario
+        const uShapeResults = calculateScenarioUShape(channels);
+        // Calculate Weighted Score for this scenario
+        const weightedResults = calculateScenarioWeighted(channels);
+
+        const card = document.createElement('div');
+        card.className = 'scenario-card';
+
+        let pathBadges = channels.map(ch => {
+            const label = getChannelLabel(ch);
+            return `<span class="scenario-channel-badge">${label}</span>`;
+        }).join('<span class="scenario-arrow">→</span>');
+
+        // Build U-Shape and Weighted rows
+        let uShapeHtml = '';
+        let weightedHtml = '';
+
+        const uniqueInScenario = [...new Set(channels)];
+        uniqueInScenario.forEach((ch, i) => {
+            const uPct = (uShapeResults[ch] || 0).toFixed(1);
+            const wPct = (weightedResults[ch] || 0).toFixed(1);
+            const color = getChannelColor(i);
+            const label = getChannelLabel(ch);
+
+            if (parseFloat(uPct) > 0) {
+                uShapeHtml += `
+                    <div class="model-bar-row">
+                        <span class="model-bar-label">${label}</span>
+                        <div class="model-bar-track">
+                            <div class="model-bar-fill" style="width:${uPct}%; background:${color};"></div>
+                        </div>
+                        <span class="model-bar-pct">${uPct}%</span>
+                    </div>
+                `;
+            }
+
+            if (parseFloat(wPct) > 0) {
+                weightedHtml += `
+                    <div class="model-bar-row">
+                        <span class="model-bar-label">${label}</span>
+                        <div class="model-bar-track">
+                            <div class="model-bar-fill" style="width:${wPct}%; background:${color};"></div>
+                        </div>
+                        <span class="model-bar-pct">${wPct}%</span>
+                    </div>
+                `;
+            }
+        });
+
+        card.innerHTML = `
+            <div class="scenario-header">
+                <div class="scenario-path">
+                    <span class="scenario-rank">#${index + 1}</span>
+                    ${pathBadges}
+                </div>
+                <div class="scenario-stats">
+                    <span class="scenario-count">${item.count.toLocaleString()}</span>
+                    <span class="scenario-pct">${pct}%</span>
+                </div>
+            </div>
+            <div class="scenario-models">
+                <div class="scenario-model-col">
+                    <div class="scenario-model-title">🏔 U-Shape</div>
+                    ${uShapeHtml}
+                </div>
+                <div class="scenario-model-col">
+                    <div class="scenario-model-title">📊 Weighted</div>
+                    ${weightedHtml}
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
 }
 
 function renderModelResults(attribution, containerId, allChannels) {
@@ -722,64 +905,30 @@ function renderModelResults(attribution, containerId, allChannels) {
     });
 }
 
-function renderAllModelResults(results, allChannels) {
-    renderModelResults(results.weighted, 'uploadWeightedResults', allChannels);
-    renderModelResults(results.uShape, 'uploadUShapeResults', allChannels);
-    renderModelResults(results.lastTouch, 'uploadLastTouchResults', allChannels);
-    renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels);
-}
-
-function renderComparisonBars(results, allChannels) {
-    const container = document.getElementById('uploadBarsContainer');
-    container.innerHTML = '';
-
-    const totalJourneys = journeys.length;
-    const maxBase = totalJourneys * 0.8 || 1;
-
-    allChannels.forEach((ch, idx) => {
-        const valLast = Math.round(results.rawLastTouch[ch] || 0);
-        const valFirst = Math.round(results.rawFirstTouch[ch] || 0);
-        const valWeighted = Math.round(results.rawWeighted[ch] || 0);
-        const valUShape = Math.round(results.rawUShape[ch] || 0);
-        const label = getChannelLabel(ch);
-
-        if (valLast + valFirst + valWeighted + valUShape === 0) return;
-
-        const scale = maxBase || 1;
-        const wLast = Math.min((valLast / scale) * 100, 100);
-        const wFirst = Math.min((valFirst / scale) * 100, 100);
-        const wWeighted = Math.min((valWeighted / scale) * 100, 100);
-        const wUShape = Math.min((valUShape / scale) * 100, 100);
-
-        const html = `
-            <div class="bar-group">
-                <div class="bar-group-header">
-                    <span>${label}</span>
-                    <span class="bar-stats">Last: ${valLast} | First: ${valFirst} | Score: ${valWeighted} | U: ${valUShape}</span>
-                </div>
-                ${wLast > 0 ? `<div class="bar-row"><div class="bar-fill fill-gray" style="width: ${wLast}%"></div></div>` : ''}
-                ${wFirst > 0 ? `<div class="bar-row"><div class="bar-fill fill-green" style="width: ${wFirst}%"></div></div>` : ''}
-                ${wWeighted > 0 ? `<div class="bar-row"><div class="bar-fill fill-purple" style="width: ${wWeighted}%"></div></div>` : ''}
-                ${wUShape > 0 ? `<div class="bar-row"><div class="bar-fill fill-blue" style="width: ${wUShape}%"></div></div>` : ''}
-            </div>
-        `;
-        container.innerHTML += html;
-    });
-}
-
-function renderScenariosTable(topPaths) {
+function renderScenariosTable(topPaths, organicCount) {
     const tbody = document.getElementById('uploadTableBody');
     tbody.innerHTML = '';
 
-    const totalCount = journeys.length || 1;
+    const loanClients = new Set();
+    cashLoanData.forEach(l => loanClients.add(l.cliCode));
+    const totalSales = loanClients.size;
 
-    if (topPaths.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Нет данных</td></tr>';
-        return;
+    // Organic row first
+    if (organicCount > 0) {
+        const organicPct = ((organicCount / totalSales) * 100).toFixed(1);
+        const tr = document.createElement('tr');
+        tr.className = 'organic-row';
+        tr.innerHTML = `
+            <td><em>🌿 Organic (без коммуникаций)</em></td>
+            <td class="col-number" style="width: 110px; text-align: right;"><strong>${organicCount.toLocaleString()}</strong></td>
+            <td class="col-number" style="width: 110px; text-align: right; color:#16A34A">${organicPct}%</td>
+        `;
+        tbody.appendChild(tr);
     }
 
-    topPaths.forEach((item, index) => {
-        const pct = ((item.count / totalCount) * 100).toFixed(1);
+    // All paths
+    topPaths.forEach((item) => {
+        const pct = ((item.count / totalSales) * 100).toFixed(1);
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${item.path}</td>
@@ -790,50 +939,44 @@ function renderScenariosTable(topPaths) {
     });
 }
 
-function renderInsight(results, allChannels) {
+function renderInsight(results, allChannels, organicCount) {
     const container = document.getElementById('uploadInsightText');
     if (!container) return;
 
-    const totalClients = cashLoanData.length;
+    const loanClients = new Set();
+    cashLoanData.forEach(l => loanClients.add(l.cliCode));
+    const totalSales = loanClients.size;
     const withComms = journeys.length;
-    const withoutComms = totalClients - withComms;
+    const organicPct = ((organicCount / totalSales) * 100).toFixed(1);
 
-    let text = `📊 Из <b>${totalClients.toLocaleString()}</b> клиентов, оформивших кредит, <b>${withComms.toLocaleString()}</b> (${((withComms / totalClients) * 100).toFixed(1)}%) имели коммуникации до выдачи.`;
+    let text = `📊 Из <b>${totalSales.toLocaleString()}</b> кредитных продаж, <b>${withComms.toLocaleString()}</b> (${((withComms / totalSales) * 100).toFixed(1)}%) имели коммуникации до выдачи.`;
 
-    if (withoutComms > 0) {
-        text += ` <b>${withoutComms.toLocaleString()}</b> клиентов оформили кредит без предшествующих каналов.`;
-    }
+    text += ` <b>${organicCount.toLocaleString()}</b> (${organicPct}%) клиентов — <b>Organic</b> (без предшествующих каналов).`;
 
-    const avgLen = (journeys.reduce((sum, j) => sum + j.path.length, 0) / journeys.length).toFixed(1);
-    text += `<br><br>📈 <b>Средняя длина пути:</b> ${avgLen} касаний. `;
+    if (journeys.length > 0) {
+        const avgLen = (journeys.reduce((sum, j) => sum + j.path.length, 0) / journeys.length).toFixed(1);
+        text += `<br><br>📈 <b>Средняя длина пути:</b> ${avgLen} касаний. `;
 
-    if (parseFloat(avgLen) <= 1.5) {
-        text += 'Большинство клиентов принимают решение после 1-2 контактов.';
-    } else if (parseFloat(avgLen) <= 3) {
-        text += 'Клиенты проходят через несколько касаний — U-Shape модель подходит.';
-    } else {
-        text += 'Длинные пути — рекомендуется Weighted или U-Shape.';
-    }
-
-    // Most impactful channel difference
-    let maxDiffChannel = '';
-    let maxDiff = 0;
-    allChannels.forEach(ch => {
-        const diff = Math.abs((results.lastTouch[ch] || 0) - (results.firstTouch[ch] || 0));
-        if (diff > maxDiff) {
-            maxDiff = diff;
-            maxDiffChannel = ch;
-        }
-    });
-
-    if (maxDiffChannel && maxDiff > 5) {
-        const lt = (results.lastTouch[maxDiffChannel] || 0).toFixed(1);
-        const ft = (results.firstTouch[maxDiffChannel] || 0).toFixed(1);
-        text += `<br><br>💡 <b>${getChannelLabel(maxDiffChannel)}</b>: Last Touch ${lt}% vs First Touch ${ft}% — `;
-        if (parseFloat(lt) > parseFloat(ft)) {
-            text += 'этот канал чаще закрывает сделку.';
+        if (parseFloat(avgLen) <= 1.5) {
+            text += 'Большинство клиентов принимают решение после 1-2 контактов — ключевой канал определяется сразу.';
+        } else if (parseFloat(avgLen) <= 3) {
+            text += 'Клиенты проходят несколько касаний — U-Shape модель наиболее информативна.';
         } else {
-            text += 'этот канал чаще привлекает клиентов.';
+            text += 'Длинные пути — Weighted Score помогает оценить вклад каждого канала.';
+        }
+
+        // Most dominant channel
+        const wKeys = Object.keys(results.weighted).sort((a, b) => results.weighted[b] - results.weighted[a]);
+        if (wKeys.length > 0) {
+            const top = wKeys[0];
+            const topPct = results.weighted[top].toFixed(1);
+            text += `<br><br>💡 <b>${getChannelLabel(top)}</b> — главный канал с <b>${topPct}%</b> вклада по Weighted Score.`;
+
+            if (wKeys.length > 1) {
+                const second = wKeys[1];
+                const secondPct = results.weighted[second].toFixed(1);
+                text += ` Второй по значимости: <b>${getChannelLabel(second)}</b> (${secondPct}%).`;
+            }
         }
     }
 
