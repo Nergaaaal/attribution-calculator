@@ -698,29 +698,36 @@ function renderSummaryCards(allChannels, marketingCount, topPaths) {
     const totalClients = journeys.length; // This is now total cash_loan clients
 
     // Card 1: Total Sales (Loans)
+    const card1Label = document.querySelectorAll('.sim-card .card-label')[0];
+    card1Label.textContent = 'ВСЕГО ПРОДАЖ';
     document.getElementById('rTotalClients').textContent = totalClients.toLocaleString();
     const totalSub = document.getElementById('rTotalClientsSub');
-    totalSub.textContent = 'всего продаж';
+    totalSub.textContent = 'клиентов cash_loan';
     totalSub.className = 'card-sub text-gray';
 
     // Card 2: Clients with Communications (replacing Unique Channels)
     const card2Label = document.querySelectorAll('.sim-card .card-label')[1];
-    card2Label.textContent = 'С КОММУНИКАЦИЯМИ';
+    card2Label.textContent = 'С МАРКЕТИНГОМ';
     document.getElementById('rUniqueChannels').textContent = marketingCount.toLocaleString();
     const conversion = ((marketingCount / totalClients) * 100).toFixed(1);
     document.getElementById('rChannelsList').textContent = `${conversion}% от всех продаж`;
 
-    // Card 3: Top Path
-    if (topPaths.length > 0) {
-        // Find top MARKETING path if possible, or just top overall
-        const topItem = topPaths[0]; // could be Organic
+    // Card 3: Top Path (Find top MARKETING path)
+    const marketingTopPaths = topPaths.filter(p => !p.path.includes('Organic'));
+
+    if (marketingTopPaths.length > 0) {
+        const topItem = marketingTopPaths[0];
 
         let displayPath = topItem.path;
         if (displayPath.length > 25) displayPath = displayPath.substring(0, 25) + '...';
 
         document.getElementById('rTopPath').textContent = displayPath;
-        const pct = ((topItem.count / totalClients) * 100).toFixed(1);
-        document.getElementById('rTopPathPercent').textContent = `${pct}% всех клиентов`;
+        // Percent of MARKETING clients (not total) to show relevance within attributed set
+        const pct = ((topItem.count / marketingCount) * 100).toFixed(1);
+        document.getElementById('rTopPathPercent').textContent = `${pct}% от клиентов с маркетингом`;
+    } else {
+        document.getElementById('rTopPath').textContent = 'Нет данных';
+        document.getElementById('rTopPathPercent').textContent = '-';
     }
 
     // Card 4: Avg Path Length (of marketing paths only)
@@ -866,13 +873,29 @@ function renderInsight(results, allChannels, marketingCount) {
 
     if (marketingCount > 0) {
         const avgLen = (journeys.filter(j => !j.isOrganic).reduce((sum, j) => sum + j.path.length, 0) / marketingCount).toFixed(1);
-        text += `<br><br>📈 <b>Анализ путей (среди клиентов с коммуникацией):</b><br>`;
+        text += `<br><br>📈 <b>Анализ путей (среди клиентов с маркетингом):</b><br>`;
         text += `Среднее число касаний: ${avgLen}. `;
 
-        if (parseFloat(avgLen) <= 1.2) {
-            text += 'В основном клиенты совершают покупку после единственного касания.';
+        // Path length breakdown
+        const len1 = journeys.filter(j => !j.isOrganic && j.path.length === 1).length;
+        const len2 = journeys.filter(j => !j.isOrganic && j.path.length === 2).length;
+        const len3Plus = journeys.filter(j => !j.isOrganic && j.path.length >= 3).length;
+
+        const pct1 = ((len1 / marketingCount) * 100).toFixed(1);
+        const pct2 = ((len2 / marketingCount) * 100).toFixed(1);
+        const pct3Plus = ((len3Plus / marketingCount) * 100).toFixed(1);
+
+        text += `<br><br>📏 <b>Распределение длины путей:</b><br>`;
+        text += `• 1 касание: <b>${pct1}%</b><br>`;
+        text += `• 2 касания: <b>${pct2}%</b><br>`;
+        text += `• 3+ касаний: <b>${pct3Plus}%</b>`;
+
+        if (parseFloat(pct1) > 80) {
+            text += '<br><br>ℹ️ <i>Так как большинство путей (>' + pct1 + '%) состоят всего из 1 касания, модели Last Touch, First Touch и U-Shape закономерно показывают одинаковые результаты. Различия моделей видны только на длинных путях.</i>';
+        } else if (parseFloat(avgLen) <= 1.2) {
+            text += '<br><br>В основном клиенты совершают покупку после единственного касания.';
         } else {
-            text += 'Заметна многоканальность — клиенты взаимодействуют с брендом несколько раз.';
+            text += '<br><br>Заметна многоканальность — клиенты взаимодействуют с брендом несколько раз.';
         }
 
         // Top channel
