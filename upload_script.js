@@ -1,15 +1,16 @@
 // ============================================
 // Upload Page — Multi-Sheet Attribution Analysis
-// v5.0 — auto-detect cash_loan + channel sheets
+// v6.0 — fixed client matching, loading progress, multi-sheet preview
 // ============================================
 
 let currentWorkbook = null;
-let cashLoanData = [];     // { cliCode, dtOpen, row }
+let cashLoanData = [];     // { cliCode, dtOpen }
 let channelEvents = [];    // { cliCode, date, channel }
 let journeys = [];         // { clientId, path, dtOpen }
 let detectedChannels = []; // ['stories', 'push', 'sms', ...]
 let channelScores = {};    // { channelName: score }
 let channelStats = {};     // { channelName: rowCount }
+let sheetPreviews = {};    // { sheetName: { headers, rows, total } }
 
 const DEFAULT_SCORE = 3;
 const CHANNEL_COLORS = [
@@ -73,82 +74,129 @@ function handleFile(file) {
     document.getElementById('fileName').textContent = file.name;
     document.getElementById('fileMeta').textContent = `${(file.size / 1024 / 1024).toFixed(1)} МБ`;
 
-    // Show loading state
-    const statusEl = document.getElementById('loadingStatus');
-    if (statusEl) {
-        statusEl.style.display = 'block';
-        statusEl.textContent = 'Чтение файла...';
-    }
+    // Show progress bar
+    showProgress('Чтение файла...', 0);
 
     const reader = new FileReader();
     reader.onload = function (e) {
-        try {
-            parseMultiSheetExcel(e.target.result);
-        } catch (err) {
-            console.error('Parse error:', err);
-            alert('Ошибка при чтении файла: ' + err.message);
-        }
+        // Use setTimeout to let the UI render the progress bar
+        setTimeout(() => {
+            try {
+                parseMultiSheetExcel(e.target.result);
+            } catch (err) {
+                console.error('Parse error:', err);
+                hideProgress();
+                alert('Ошибка при чтении файла: ' + err.message);
+            }
+        }, 50);
     };
     reader.readAsArrayBuffer(file);
 }
 
+function showProgress(text, percent) {
+    const el = document.getElementById('loadingStatus');
+    if (!el) return;
+    el.style.display = 'block';
+    el.innerHTML = `
+        <div class="progress-wrapper">
+            <div class="progress-text">${text}</div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width: ${percent}%"></div>
+            </div>
+        </div>
+    `;
+}
+
+function hideProgress() {
+    const el = document.getElementById('loadingStatus');
+    if (el) el.style.display = 'none';
+}
+
 function parseMultiSheetExcel(buffer) {
+    showProgress('Парсинг Excel...', 5);
+
     currentWorkbook = XLSX.read(buffer, { type: 'array', cellDates: true });
 
-    const sheetNames = currentWorkbook.SheetNames.map(n => n.toLowerCase().trim());
+    const sheetNamesLower = currentWorkbook.SheetNames.map(n => n.toLowerCase().trim());
 
     // Detect cash_loan sheet
-    const cashLoanIdx = sheetNames.findIndex(n => n === 'cash_loan' || n === 'cashloan' || n === 'loans');
+    const cashLoanIdx = sheetNamesLower.findIndex(n => n === 'cash_loan' || n === 'cashloan' || n === 'loans');
     if (cashLoanIdx === -1) {
+        hideProgress();
         alert('Не найден лист "cash_loan" с выдачами кредитов.');
         return;
     }
 
-    const statusEl = document.getElementById('loadingStatus');
-
     // Parse cash_loan
-    if (statusEl) statusEl.textContent = 'Читаю выдачи кредитов...';
-    parseCashLoan(currentWorkbook.SheetNames[cashLoanIdx]);
+    showProgress('Читаю выдачи кредитов (cash_loan)...', 10);
 
-    // Detect and parse channel sheets
-    detectedChannels = [];
-    channelEvents = [];
-    channelStats = {};
+    // Use setTimeout for each step so UI can update
+    setTimeout(() => {
+        parseCashLoan(currentWorkbook.SheetNames[cashLoanIdx]);
+        parseChannelSheetsSequentially(0);
+    }, 30);
+}
 
-    currentWorkbook.SheetNames.forEach((sheetName, idx) => {
-        const lower = sheetName.toLowerCase().trim();
-        if (lower === 'cash_loan' || lower === 'cashloan' || lower === 'loans') return;
+function parseChannelSheetsSequentially(index) {
+    const nonLoanSheets = currentWorkbook.SheetNames.filter(name => {
+        const lower = name.toLowerCase().trim();
+        return lower !== 'cash_loan' && lower !== 'cashloan' && lower !== 'loans';
+    });
 
-        // Try to match known channels
-        const configKey = Object.keys(CHANNEL_CONFIG).find(k => lower.includes(k));
-        if (configKey) {
-            if (statusEl) statusEl.textContent = `Читаю канал: ${sheetName}...`;
+    if (index === 0) {
+        detectedChannels = [];
+        channelEvents = [];
+        channelStats = {};
+        sheetPreviews = {};
+    }
+
+    if (index >= nonLoanSheets.length) {
+        // All sheets parsed — finalize
+        finalizeParsing();
+        return;
+    }
+
+    const sheetName = nonLoanSheets[index];
+    const lower = sheetName.toLowerCase().trim();
+    const configKey = Object.keys(CHANNEL_CONFIG).find(k => lower.includes(k));
+
+    const progressPct = 15 + Math.round((index / nonLoanSheets.length) * 70);
+
+    if (configKey) {
+        showProgress(`Читаю канал: ${sheetName} (${index + 1}/${nonLoanSheets.length})...`, progressPct);
+
+        setTimeout(() => {
             const config = CHANNEL_CONFIG[configKey];
             const count = parseChannelSheet(sheetName, configKey, config);
             channelStats[configKey] = count;
             detectedChannels.push(configKey);
-        }
-    });
+
+            parseChannelSheetsSequentially(index + 1);
+        }, 30);
+    } else {
+        parseChannelSheetsSequentially(index + 1);
+    }
+}
+
+function finalizeParsing() {
+    hideProgress();
 
     if (detectedChannels.length === 0) {
-        alert('Не найдены листы каналов коммуникаций (stories, push, sms, telemarket, banner, digital).');
+        alert('Не найдены листы каналов коммуникаций.');
         return;
     }
 
-    if (statusEl) statusEl.style.display = 'none';
+    console.log(`Parsed: ${cashLoanData.length} loans, ${channelEvents.length} events, channels: ${detectedChannels.join(', ')}`);
 
-
-    // Show detected channels and preview
     renderDetectedChannels();
-    renderPreview();
+    renderPreviewTabs();
+
     document.getElementById('channelsSummary').style.display = 'block';
     document.getElementById('previewCard').style.display = 'flex';
 
-    // Show channel scores
     const uniqueChannels = [...new Set(detectedChannels)];
     renderChannelScores(uniqueChannels);
 
-    // Show run button
     document.getElementById('runAnalysisBtn').style.display = 'flex';
 }
 
@@ -162,8 +210,13 @@ function parseCashLoan(sheetName) {
     }
 
     const headers = json[0].map(h => String(h || '').trim().toUpperCase());
-    const cliCodeIdx = headers.findIndex(h => h === 'CLI_CODE' || h === 'CLIENT_CD' || h === 'CLI_ID');
-    const dtOpenIdx = headers.findIndex(h => h === 'DT_OPEN' || h === 'DATE_OPEN' || h === 'OPEN_DATE');
+
+    // PRIORITY search: CLI_CODE > CLIENT_CD > CLI_ID
+    let cliCodeIdx = headers.indexOf('CLI_CODE');
+    if (cliCodeIdx === -1) cliCodeIdx = headers.indexOf('CLIENT_CD');
+    if (cliCodeIdx === -1) cliCodeIdx = headers.indexOf('CLI_ID');
+
+    const dtOpenIdx = headers.indexOf('DT_OPEN');
 
     if (cliCodeIdx === -1) {
         alert('Не найден столбец CLI_CODE / CLIENT_CD в cash_loan.');
@@ -174,21 +227,25 @@ function parseCashLoan(sheetName) {
         return;
     }
 
+    console.log(`cash_loan: using column "${headers[cliCodeIdx]}" (index ${cliCodeIdx}) for client ID`);
+
     cashLoanData = [];
     for (let i = 1; i < json.length; i++) {
         const row = json[i];
-        const cliCode = String(row[cliCodeIdx] || '').trim();
+        const cliCode = normalizeId(row[cliCodeIdx]);
         const dtOpen = toDate(row[dtOpenIdx]);
 
         if (cliCode && dtOpen) {
-            cashLoanData.push({ cliCode, dtOpen, row, headers: json[0] });
+            cashLoanData.push({ cliCode, dtOpen });
         }
     }
 
-    // Store headers for preview
-    cashLoanData._headers = json[0];
-    cashLoanData._rawRows = json.slice(1, 11); // first 10 rows for preview
-    cashLoanData._totalRows = json.length - 1;
+    // Store preview data
+    sheetPreviews['cash_loan'] = {
+        headers: json[0],
+        rows: json.slice(1, 11),
+        total: json.length - 1
+    };
 }
 
 function parseChannelSheet(sheetName, channelName, config) {
@@ -198,24 +255,34 @@ function parseChannelSheet(sheetName, channelName, config) {
     if (json.length < 2) return 0;
 
     const headers = json[0].map(h => String(h || '').trim().toUpperCase());
-    const clientIdx = headers.findIndex(h =>
-        h === config.clientCol.toUpperCase() ||
-        h === 'CLI_CODE' ||
-        h === 'CLIENT_CD'
-    );
-    const dateIdx = headers.findIndex(h =>
-        h === config.dateCol.toUpperCase() ||
-        h === 'EVENT_TIME' ||
-        h === 'CREATED' ||
-        h === 'DATE'
-    );
 
-    if (clientIdx === -1 || dateIdx === -1) return 0;
+    // Find client column — priority search
+    let clientIdx = headers.indexOf('CLIENT_CD');
+    if (clientIdx === -1) clientIdx = headers.indexOf('CLI_CODE');
+    if (clientIdx === -1) clientIdx = headers.indexOf('CLI_ID');
+
+    // Find date column
+    let dateIdx = headers.indexOf(config.dateCol.toUpperCase());
+    if (dateIdx === -1) dateIdx = headers.indexOf('EVENT_TIME');
+    if (dateIdx === -1) dateIdx = headers.indexOf('CREATED');
+    if (dateIdx === -1) dateIdx = headers.indexOf('DATE');
+
+    if (clientIdx === -1 || dateIdx === -1) {
+        console.warn(`${sheetName}: client col (${clientIdx}) or date col (${dateIdx}) not found`);
+        return 0;
+    }
+
+    // Store preview data
+    sheetPreviews[channelName] = {
+        headers: json[0],
+        rows: json.slice(1, 11),
+        total: json.length - 1
+    };
 
     let count = 0;
     for (let i = 1; i < json.length; i++) {
         const row = json[i];
-        const clientId = String(row[clientIdx] || '').trim().replace(/^0+/, '');
+        const clientId = normalizeId(row[clientIdx]);
         const date = toDate(row[dateIdx]);
 
         if (clientId && date) {
@@ -227,8 +294,13 @@ function parseChannelSheet(sheetName, channelName, config) {
     return count;
 }
 
+function normalizeId(val) {
+    if (val === null || val === undefined || val === '') return '';
+    return String(val).trim().replace(/^0+/, '') || '0';
+}
+
 function toDate(val) {
-    if (val instanceof Date) return val;
+    if (val instanceof Date && !isNaN(val)) return val;
     if (typeof val === 'number') {
         // Excel serial date
         const epoch = new Date(1899, 11, 30);
@@ -249,6 +321,7 @@ function clearFile() {
     currentWorkbook = null;
     channelScores = {};
     channelStats = {};
+    sheetPreviews = {};
 
     document.getElementById('uploadInfo').style.display = 'none';
     document.getElementById('dropzone').classList.remove('hidden-zone');
@@ -256,8 +329,8 @@ function clearFile() {
     document.getElementById('previewCard').style.display = 'none';
     document.getElementById('channelScoresSection').style.display = 'none';
     document.getElementById('resultsSection').style.display = 'none';
-    const statusEl = document.getElementById('loadingStatus');
-    if (statusEl) statusEl.style.display = 'none';
+    document.getElementById('runAnalysisBtn').style.display = 'none';
+    hideProgress();
     document.getElementById('fileInput').value = '';
 }
 
@@ -296,23 +369,56 @@ function renderDetectedChannels() {
     });
 }
 
-// ---- DATA PREVIEW (cash_loan) ----
+// ---- MULTI-SHEET PREVIEW ----
 
-function renderPreview() {
+function renderPreviewTabs() {
+    const tabsContainer = document.getElementById('previewTabs');
+    tabsContainer.innerHTML = '';
+
+    const sheetKeys = Object.keys(sheetPreviews);
+
+    sheetKeys.forEach((key, idx) => {
+        const isLoan = key === 'cash_loan';
+        const config = CHANNEL_CONFIG[key];
+        const label = isLoan ? '🏦 cash_loan' : (config ? config.label : key);
+
+        const tab = document.createElement('button');
+        tab.className = 'preview-tab' + (idx === 0 ? ' active' : '');
+        tab.textContent = label;
+        tab.dataset.sheet = key;
+        tab.onclick = () => switchPreviewTab(key);
+        tabsContainer.appendChild(tab);
+    });
+
+    // Show first sheet
+    if (sheetKeys.length > 0) {
+        renderPreviewTable(sheetKeys[0]);
+    }
+}
+
+function switchPreviewTab(sheetKey) {
+    // Update active tab
+    document.querySelectorAll('.preview-tab').forEach(t => t.classList.remove('active'));
+    const activeTab = document.querySelector(`.preview-tab[data-sheet="${sheetKey}"]`);
+    if (activeTab) activeTab.classList.add('active');
+
+    renderPreviewTable(sheetKey);
+}
+
+function renderPreviewTable(sheetKey) {
+    const data = sheetPreviews[sheetKey];
+    if (!data) return;
+
     const head = document.getElementById('previewHead');
     const body = document.getElementById('previewBody');
     const count = document.getElementById('previewCount');
 
-    if (!cashLoanData._headers) return;
+    count.textContent = `Первые ${data.rows.length} из ${data.total.toLocaleString()} строк`;
 
-    const totalRows = cashLoanData._totalRows;
-    const showRows = cashLoanData._rawRows.length;
-    count.textContent = `Первые ${showRows} из ${totalRows} строк (cash_loan)`;
+    head.innerHTML = '<tr>' + data.headers.map(h => `<th>${h || ''}</th>`).join('') + '</tr>';
 
-    head.innerHTML = '<tr>' + cashLoanData._headers.map(h => `<th>${h || ''}</th>`).join('') + '</tr>';
-
-    body.innerHTML = cashLoanData._rawRows.map(row =>
-        '<tr>' + cashLoanData._headers.map((_, i) => {
+    body.innerHTML = data.rows.map(row =>
+        '<tr>' + data.headers.map((_, i) => {
             let val = row[i];
             if (val instanceof Date) val = val.toLocaleDateString('ru-RU');
             return `<td>${val != null ? val : ''}</td>`;
@@ -355,71 +461,90 @@ function updateScore(input) {
 
 function runAnalysis() {
     const btn = document.getElementById('runAnalysisBtn');
-    btn.innerHTML = 'Расчет...';
+    btn.innerHTML = '⏳ Расчет...';
     btn.disabled = true;
+
+    showProgress('Построение путей клиентов...', 85);
 
     setTimeout(() => {
         try {
             buildJourneys();
 
             if (journeys.length === 0) {
-                alert('Не удалось построить пути клиентов. Ни один клиент из cash_loan не имел коммуникаций до выдачи кредита.');
+                hideProgress();
+                alert('Не удалось построить пути клиентов. Проверьте, что CLI_CODE/CLIENT_CD совпадают между cash_loan и листами каналов.\n\nКлиентов в cash_loan: ' + cashLoanData.length + '\nСобытий каналов: ' + channelEvents.length);
                 return;
             }
 
-            const allChannels = getUniqueChannels();
+            showProgress('Расчёт моделей атрибуции...', 92);
 
-            // Ensure scores exist
-            allChannels.forEach(ch => {
-                if (channelScores[ch] === undefined) channelScores[ch] = DEFAULT_SCORE;
-            });
+            setTimeout(() => {
+                const allChannels = getUniqueChannels();
 
-            const results = calculateAllModels(allChannels);
-            const topPaths = analyzePathFrequencies();
+                allChannels.forEach(ch => {
+                    if (channelScores[ch] === undefined) channelScores[ch] = DEFAULT_SCORE;
+                });
 
-            renderSummaryCards(allChannels, topPaths);
-            renderAllModelResults(results, allChannels);
-            renderComparisonBars(results, allChannels);
-            renderScenariosTable(topPaths);
-            renderInsight(results, allChannels);
+                const results = calculateAllModels(allChannels);
+                const topPaths = analyzePathFrequencies();
 
-            document.getElementById('resultsSection').style.display = 'block';
-            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                renderSummaryCards(allChannels, topPaths);
+                renderAllModelResults(results, allChannels);
+                renderComparisonBars(results, allChannels);
+                renderScenariosTable(topPaths);
+                renderInsight(results, allChannels);
+
+                hideProgress();
+
+                document.getElementById('resultsSection').style.display = 'block';
+                document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                btn.innerHTML = '<span class="arrow">▶</span> Рассчитать атрибуцию';
+                btn.disabled = false;
+            }, 30);
 
         } catch (e) {
             console.error('Analysis Error:', e);
+            hideProgress();
             alert('Ошибка анализа: ' + e.message);
-        } finally {
             btn.innerHTML = '<span class="arrow">▶</span> Рассчитать атрибуцию';
             btn.disabled = false;
         }
-    }, 100);
+    }, 50);
 }
 
 function buildJourneys() {
     journeys = [];
 
-    // Build lookup: CLI_CODE → DT_OPEN (take earliest if multiple loans)
+    // Build lookup: CLI_CODE → DT_OPEN (take earliest loan if multiple)
     const loanMap = {};
     cashLoanData.forEach(loan => {
-        const code = loan.cliCode.replace(/^0+/, '');
-        if (!loanMap[code] || loan.dtOpen < loanMap[code]) {
-            loanMap[code] = loan.dtOpen;
+        if (!loanMap[loan.cliCode] || loan.dtOpen < loanMap[loan.cliCode]) {
+            loanMap[loan.cliCode] = loan.dtOpen;
         }
     });
 
-    // Group channel events by client
-    const clientEvents = {};
-    channelEvents.forEach(evt => {
-        const code = evt.cliCode;
-        if (!loanMap[code]) return; // not a cash_loan client
+    console.log(`Loan map: ${Object.keys(loanMap).length} unique clients`);
 
-        const dtOpen = loanMap[code];
+    // Group channel events by client, filter to loan clients and events BEFORE loan
+    const clientEvents = {};
+    let matchCount = 0;
+    let beforeCount = 0;
+
+    channelEvents.forEach(evt => {
+        if (!loanMap[evt.cliCode]) return;
+
+        matchCount++;
+        const dtOpen = loanMap[evt.cliCode];
+
         if (evt.date >= dtOpen) return; // event AFTER loan, skip
 
-        if (!clientEvents[code]) clientEvents[code] = [];
-        clientEvents[code].push(evt);
+        beforeCount++;
+        if (!clientEvents[evt.cliCode]) clientEvents[evt.cliCode] = [];
+        clientEvents[evt.cliCode].push(evt);
     });
+
+    console.log(`Events matching loan clients: ${matchCount}, before DT_OPEN: ${beforeCount}`);
 
     // Build journeys sorted by date
     Object.keys(clientEvents).forEach(clientId => {
@@ -435,6 +560,8 @@ function buildJourneys() {
             });
         }
     });
+
+    console.log(`Built ${journeys.length} journeys`);
 }
 
 function getUniqueChannels() {
@@ -463,7 +590,7 @@ function calculateAllModels(allChannels) {
         const n = path.length;
         if (n === 0) return;
 
-        // Weighted Score (using channel scores)
+        // Weighted Score
         let totalScore = 0;
         const scores = path.map(ch => {
             const s = channelScores[ch] !== undefined ? channelScores[ch] : DEFAULT_SCORE;
@@ -575,7 +702,6 @@ function renderModelResults(attribution, containerId, allChannels) {
 
     sortedKeys.forEach((ch, index) => {
         const pct = attribution[ch] || 0;
-
         const colorIdx = allChannels.indexOf(ch);
         const color = getChannelColor(colorIdx);
         const label = getChannelLabel(ch);
@@ -675,7 +801,7 @@ function renderInsight(results, allChannels) {
     let text = `📊 Из <b>${totalClients.toLocaleString()}</b> клиентов, оформивших кредит, <b>${withComms.toLocaleString()}</b> (${((withComms / totalClients) * 100).toFixed(1)}%) имели коммуникации до выдачи.`;
 
     if (withoutComms > 0) {
-        text += ` <b>${withoutComms.toLocaleString()}</b> клиентов оформили кредит без предшествующих каналов коммуникации.`;
+        text += ` <b>${withoutComms.toLocaleString()}</b> клиентов оформили кредит без предшествующих каналов.`;
     }
 
     const avgLen = (journeys.reduce((sum, j) => sum + j.path.length, 0) / journeys.length).toFixed(1);
@@ -684,12 +810,12 @@ function renderInsight(results, allChannels) {
     if (parseFloat(avgLen) <= 1.5) {
         text += 'Большинство клиентов принимают решение после 1-2 контактов.';
     } else if (parseFloat(avgLen) <= 3) {
-        text += 'Клиенты проходят через несколько касаний — U-Shape модель подходит для оценки.';
+        text += 'Клиенты проходят через несколько касаний — U-Shape модель подходит.';
     } else {
-        text += 'Длинные пути клиентов — рекомендуется Weighted или U-Shape для атрибуции.';
+        text += 'Длинные пути — рекомендуется Weighted или U-Shape.';
     }
 
-    // Find most impactful channel difference
+    // Most impactful channel difference
     let maxDiffChannel = '';
     let maxDiff = 0;
     allChannels.forEach(ch => {
@@ -705,9 +831,9 @@ function renderInsight(results, allChannels) {
         const ft = (results.firstTouch[maxDiffChannel] || 0).toFixed(1);
         text += `<br><br>💡 <b>${getChannelLabel(maxDiffChannel)}</b>: Last Touch ${lt}% vs First Touch ${ft}% — `;
         if (parseFloat(lt) > parseFloat(ft)) {
-            text += 'этот канал чаще закрывает сделку (последнее касание).';
+            text += 'этот канал чаще закрывает сделку.';
         } else {
-            text += 'этот канал чаще привлекает клиентов (первое касание).';
+            text += 'этот канал чаще привлекает клиентов.';
         }
     }
 

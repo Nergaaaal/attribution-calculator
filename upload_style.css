@@ -151,34 +151,74 @@
     border-color: #FCA5A5;
 }
 
-/* ---- LOADING STATUS ---- */
+/* ---- LOADING STATUS / PROGRESS BAR ---- */
 .loading-status {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
+    margin-bottom: 16px;
+    padding: 16px;
     background: #EFF6FF;
     border: 1px solid #BFDBFE;
     border-radius: 12px;
-    margin-bottom: 16px;
-    font-size: 14px;
+}
+
+.progress-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.progress-text {
+    font-size: 13px;
     font-weight: 500;
     color: #1D4ED8;
 }
 
-.loading-spinner {
-    width: 18px;
-    height: 18px;
-    border: 3px solid #BFDBFE;
-    border-top-color: #3B82F6;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+.progress-bar-bg {
+    height: 6px;
+    background: #DBEAFE;
+    border-radius: 4px;
+    overflow: hidden;
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3B82F6, #667EEA);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+/* ---- PREVIEW TABS ---- */
+.preview-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0 16px 12px;
+    overflow-x: auto;
+    flex-wrap: wrap;
+}
+
+.preview-tab {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid #E2E8F0;
+    background: #F8FAFC;
+    color: #64748B;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
+}
+
+.preview-tab:hover {
+    background: #EFF6FF;
+    border-color: #93C5FD;
+    color: #3B82F6;
+}
+
+.preview-tab.active {
+    background: #3B82F6;
+    color: white;
+    border-color: #3B82F6;
 }
 
 /* ---- DETECTED CHANNELS SUMMARY ---- */
