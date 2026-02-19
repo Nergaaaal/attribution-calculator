@@ -33,7 +33,8 @@
                 <div class="header-icon">📁</div>
                 <div>
                     <h1>Загрузка данных</h1>
-                    <p class="header-subtitle">Загрузите Excel или CSV файл с данными о коммуникациях клиентов</p>
+                    <p class="header-subtitle">Загрузите Excel файл с листами каналов коммуникаций и выдачами кредитов
+                    </p>
                 </div>
             </div>
 
@@ -49,65 +50,45 @@
                 </div>
             </div>
 
-            <!-- Sheet Selector (for Excel with multiple sheets) -->
-            <div class="sheet-selector" id="sheetSelector" style="display:none;">
-                <label>Выберите лист:</label>
-                <select id="sheetSelect" class="mapping-select"></select>
+            <!-- Loading Status -->
+            <div class="loading-status" id="loadingStatus" style="display:none;">
+                <div class="loading-spinner"></div>
+                <span>Чтение файла...</span>
             </div>
 
             <!-- Drop Zone (hidden after file selected) -->
             <div class="upload-dropzone" id="dropzone">
                 <div class="dropzone-content">
-                    <div class="dropzone-icon">📄</div>
-                    <h2>Перетащите файл сюда или <span class="dropzone-link">выберите файл</span></h2>
-                    <p>Поддерживаются .xlsx, .xls, .csv</p>
+                    <div class="dropzone-icon">📊</div>
+                    <h2>Перетащите Excel файл сюда или <span class="dropzone-link">выберите файл</span></h2>
+                    <p>Поддерживается .xlsx, .xls с листами: cash_loan + каналы (stories, push, sms, telemarket, banner,
+                        digital)</p>
                 </div>
-                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
             </div>
 
-            <!-- Column Mapping -->
-            <div class="column-mapping" id="columnMapping" style="display:none;">
+            <!-- Detected Channels Summary (auto-filled after file load) -->
+            <div class="channels-summary" id="channelsSummary" style="display:none;">
                 <div class="mapping-section-header">
-                    <span class="mapping-icon">⚙️</span>
-                    <h3>МАППИНГ КОЛОНОК</h3>
+                    <span class="mapping-icon">📡</span>
+                    <h3>ОБНАРУЖЕННЫЕ КАНАЛЫ</h3>
                 </div>
-                <p class="mapping-hint">Укажите, какие колонки в вашем файле соответствуют нужным полям</p>
-
-                <div class="mapping-grid-3col">
-                    <div class="mapping-item">
-                        <label><span class="field-icon">🆔</span> ID Клиента</label>
-                        <select id="colClientId" class="mapping-select">
-                            <option value="">— Выберите —</option>
-                        </select>
-                    </div>
-                    <div class="mapping-item">
-                        <label><span class="field-icon">📡</span> Канал коммуникации</label>
-                        <select id="colChannel" class="mapping-select">
-                            <option value="">— Выберите —</option>
-                        </select>
-                    </div>
-                    <div class="mapping-item">
-                        <label><span class="field-icon">⏰</span> Дата / Время</label>
-                        <select id="colDate" class="mapping-select">
-                            <option value="">— Выберите —</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Channel Scores (appears after first run or when channels detected) -->
-                <div class="channel-scores-section" id="channelScoresSection" style="display:none;">
-                    <div class="scores-header">
-                        <span class="field-icon">🎯</span>
-                        <h4>Баллы каналов</h4>
-                        <span class="scores-hint">Для Weighted Score модели</span>
-                    </div>
-                    <div class="scores-grid" id="channelScoresGrid"></div>
-                </div>
-
-                <button class="run-analysis-btn" id="runAnalysisBtn">
-                    <span class="arrow">▶</span> Рассчитать атрибуцию
-                </button>
+                <div class="channels-stats-grid" id="channelsGrid"></div>
             </div>
+
+            <!-- Channel Scores -->
+            <div class="channel-scores-section" id="channelScoresSection" style="display:none;">
+                <div class="scores-header">
+                    <span class="field-icon">🎯</span>
+                    <h4>Баллы каналов</h4>
+                    <span class="scores-hint">Для Weighted Score модели</span>
+                </div>
+                <div class="scores-grid" id="channelScoresGrid"></div>
+            </div>
+
+            <button class="run-analysis-btn" id="runAnalysisBtn" style="display:none;">
+                <span class="arrow">▶</span> Рассчитать атрибуцию
+            </button>
         </div>
 
         <!-- Data Preview Card -->
@@ -132,7 +113,7 @@
         <!-- Summary Cards -->
         <div class="sim-cards-grid">
             <div class="sim-card">
-                <div class="card-label">ВСЕГО КЛИЕНТОВ</div>
+                <div class="card-label">КЛИЕНТЫ С КОММУНИКАЦИЯМИ</div>
                 <div class="card-value" id="rTotalClients">0</div>
                 <div class="card-sub text-green" id="rTotalClientsSub">уникальных путей</div>
             </div>
