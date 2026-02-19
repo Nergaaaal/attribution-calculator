@@ -111,14 +111,14 @@
         <!-- Summary Cards -->
         <div class="sim-cards-grid">
             <div class="sim-card">
-                <div class="card-label">ВСЕГО ПРОДАЖ</div>
-                <div class="card-value" id="rTotalSales">0</div>
-                <div class="card-sub text-gray" id="rTotalSalesSub">оформленных кредитов</div>
+                <div class="card-label">КЛИЕНТЫ С КОММУНИКАЦИЯМИ</div>
+                <div class="card-value" id="rTotalClients">0</div>
+                <div class="card-sub text-green" id="rTotalClientsSub">уникальных путей</div>
             </div>
             <div class="sim-card">
-                <div class="card-label">С КОММУНИКАЦИЯМИ</div>
-                <div class="card-value" id="rWithComms">0</div>
-                <div class="card-sub text-green" id="rWithCommsSub"></div>
+                <div class="card-label">УНИКАЛЬНЫХ КАНАЛОВ</div>
+                <div class="card-value" id="rUniqueChannels">0</div>
+                <div class="card-sub text-gray" id="rChannelsList"></div>
             </div>
             <div class="sim-card">
                 <div class="card-label">САМЫЙ ЧАСТЫЙ ПУТЬ</div>
@@ -132,15 +132,8 @@
             </div>
         </div>
 
-        <!-- Top Scenarios with Attribution -->
-        <div class="section-title" style="margin-top: 8px;">
-            <span class="icon-bar">📋</span>
-            <h3>ТОП СЦЕНАРИИ КОММУНИКАЦИЙ</h3>
-        </div>
-        <div id="topScenariosContainer"></div>
-
-        <!-- Attribution Models (2 cards: Weighted + U-Shape) -->
-        <div class="upload-models-grid models-2col">
+        <!-- Attribution Models (4 cards) -->
+        <div class="upload-models-grid">
             <div class="attribution-model">
                 <div class="model-header">
                     <span class="icon-bar">📊</span>
@@ -166,9 +159,49 @@
                     <div class="results-list" id="uploadUShapeResults"></div>
                 </div>
             </div>
+
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">👆</span>
+                    <div>
+                        <h3>Last Touch</h3>
+                        <p class="model-subtitle">100% последнему каналу</p>
+                    </div>
+                </div>
+                <div class="model-results-scroll">
+                    <div class="results-list" id="uploadLastTouchResults"></div>
+                </div>
+            </div>
+
+            <div class="attribution-model">
+                <div class="model-header">
+                    <span class="icon-bar">🎯</span>
+                    <div>
+                        <h3>First Touch</h3>
+                        <p class="model-subtitle">100% первому каналу</p>
+                    </div>
+                </div>
+                <div class="model-results-scroll">
+                    <div class="results-list" id="uploadFirstTouchResults"></div>
+                </div>
+            </div>
         </div>
 
-        <!-- All Scenarios Table -->
+        <!-- Comparison Bars -->
+        <div class="sim-chart-section">
+            <div class="section-title">
+                <span class="icon-bar">📊</span> Распределение вклада (Атрибуция продаж)
+            </div>
+            <div id="uploadBarsContainer" class="sim-bars-container"></div>
+            <div class="sim-legend">
+                <div class="legend-item"><span class="dot l-gray"></span> Last Touch</div>
+                <div class="legend-item"><span class="dot l-green"></span> First Touch</div>
+                <div class="legend-item"><span class="dot l-purple"></span> Weighted Score</div>
+                <div class="legend-item"><span class="dot l-blue"></span> U-Shape</div>
+            </div>
+        </div>
+
+        <!-- Top Scenarios Table -->
         <div class="sim-table-section">
             <div class="section-title">
                 <span class="icon">📋</span>
