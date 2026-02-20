@@ -1,9 +1,9 @@
 const channels = [
-    { id: 'digital', name: 'Digital Ads', icon: '🎯', score: 2, color: 'digital' },
-    { id: 'stories', name: 'Stories', icon: '📱', score: 2, color: 'stories' },
-    { id: 'push', name: 'Push', icon: '🔔', score: 3, color: 'push' },
-    { id: 'sms', name: 'SMS', icon: '💬', score: 3, color: 'sms' },
-    { id: 'telemarketing', name: 'Telemarketing', icon: '📞', score: 5, color: 'telemarketing' },
+    { id: 'digital', name: 'Digital Ads', icon: '🎯', score: 3, color: 'digital' },
+    { id: 'stories', name: 'Stories', icon: '📱', score: 1, color: 'stories' },
+    { id: 'push', name: 'Push', icon: '🔔', score: 4, color: 'push' },
+    { id: 'sms', name: 'SMS', icon: '💬', score: 2, color: 'sms' },
+    { id: 'telemarketing', name: 'Telemarketing', icon: '📞', score: 4, color: 'telemarketing' },
     { id: 'offline', name: 'Offline', icon: '🏢', score: 5, color: 'offline' }
 ];
 

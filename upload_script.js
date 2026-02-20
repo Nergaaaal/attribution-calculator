@@ -13,6 +13,15 @@ let channelStats = {};     // { channelName: rowCount }
 let sheetPreviews = {};    // { sheetName: { headers, rows, total } }
 
 const DEFAULT_SCORE = 3;
+const INITIAL_SCORES = {
+    'stories': 1,
+    'digital': 3,
+    'push': 4,
+    'sms': 2,
+    'telemarket': 4,
+    'banner': 1
+};
+
 const CHANNEL_COLORS = [
     '#3B82F6', '#ED64A6', '#ED8936', '#9F7AEA',
     '#48BB78', '#667EEA', '#F59E0B', '#EF4444',
@@ -434,7 +443,7 @@ function renderChannelScores(allChannels) {
 
     allChannels.forEach(ch => {
         if (channelScores[ch] === undefined) {
-            channelScores[ch] = DEFAULT_SCORE;
+            channelScores[ch] = INITIAL_SCORES[ch] !== undefined ? INITIAL_SCORES[ch] : DEFAULT_SCORE;
         }
 
         const config = CHANNEL_CONFIG[ch];
@@ -454,7 +463,8 @@ function renderChannelScores(allChannels) {
 }
 
 function updateScore(input) {
-    channelScores[input.dataset.channel] = parseFloat(input.value) || DEFAULT_SCORE;
+    const ch = input.dataset.channel;
+    channelScores[ch] = parseFloat(input.value) || (INITIAL_SCORES[ch] !== undefined ? INITIAL_SCORES[ch] : DEFAULT_SCORE);
 }
 
 // ---- ANALYSIS ----
