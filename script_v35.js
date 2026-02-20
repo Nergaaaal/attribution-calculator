@@ -167,7 +167,7 @@ function calculateWeightedScore() {
     // 2. Extract uniquely scored channels
     const uniqueIds = [...new Set(deduplicated.map(j => j.id))];
     let sum = 0;
-    
+
     // get unique score sum
     const channelVals = {};
     uniqueIds.forEach(id => {
@@ -303,26 +303,41 @@ function renderResults(attribution, containerId) {
         return;
     }
 
-    // Sort keys based on order in the 'journey' array
-    // If a channel appears multiple times, use first appearance.
-    // If not in journey (shouldn't happen for attribution of journey), put at end.
+    // Filter out channels with 0% score early
+    const nonZeroIds = Object.keys(attribution).filter(id => attribution[id] > 0);
+
+    if (nonZeroIds.length === 0) {
+        container.innerHTML = `
+            <div class="sim-empty-state">
+                <div class="empty-icon">✨</div>
+                <div class="empty-text">Все каналы исключены или имеют 0%</div>
+            </div>
+        `;
+        return;
+    }
+
+    // Sort keys based on exact order in the 'journey' array (ignoring duplicates for deduplicated models)
     let sortedKeys;
     if (journey.length > 0) {
-        // Create unique ordered list from journey
-        const uniqueJourneyIds = [...new Set(journey.map(item => item.id))];
-        sortedKeys = Object.keys(attribution).sort((a, b) => {
+        // Create an ordered unique list directly from the current journey sequence
+        const uniqueJourneyIds = [];
+        journey.forEach(item => {
+            if (!uniqueJourneyIds.includes(item.id)) {
+                uniqueJourneyIds.push(item.id);
+            }
+        });
+
+        sortedKeys = nonZeroIds.sort((a, b) => {
             const idxA = uniqueJourneyIds.indexOf(a);
             const idxB = uniqueJourneyIds.indexOf(b);
-            // If both in journey, sort by index
+
             if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-            // If one in journey, it comes first
             if (idxA !== -1) return -1;
             if (idxB !== -1) return 1;
-            return 0;
+            return attribution[b] - attribution[a]; // fallback
         });
     } else {
-        // Fallback to value desc
-        sortedKeys = Object.keys(attribution).sort((a, b) => attribution[b] - attribution[a]);
+        sortedKeys = nonZeroIds.sort((a, b) => attribution[b] - attribution[a]);
     }
 
     container.innerHTML = '';
@@ -553,7 +568,7 @@ function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
         if (rawPath.length > 0) {
             path.push(rawPath[0]);
             for (let i = 1; i < rawPath.length; i++) {
-                 if (rawPath[i] !== rawPath[i - 1]) path.push(rawPath[i]);
+                if (rawPath[i] !== rawPath[i - 1]) path.push(rawPath[i]);
             }
         }
 
@@ -598,7 +613,7 @@ function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
             } else {
                 uShapeTotals[filteredPath[0]] += 0.4;
                 uShapeTotals[filteredPath[n - 1]] += 0.4;
-                
+
                 const middleIds = filteredPath.slice(1, n - 1);
                 const uniqueMiddle = [...new Set(middleIds)];
                 if (uniqueMiddle.length > 0) {

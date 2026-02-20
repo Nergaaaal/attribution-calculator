@@ -547,7 +547,7 @@ function buildJourneys() {
 
     cashLoanData.forEach(loan => {
         const cliEvents = clientEvents[loan.cliCode] || [];
-        
+
         // Include events up to the end of the loan day if no time is provided
         let cutoff = new Date(loan.dtOpen.getTime());
         if (cutoff.getHours() === 0 && cutoff.getMinutes() === 0 && cutoff.getSeconds() === 0) {
@@ -609,7 +609,7 @@ function getUniqueChannels() {
 function calculateAllModels(marketingJourneys, allChannels) {
     const lastTouch = {};
     const firstTouch = {};
-    
+
     allChannels.forEach(ch => {
         lastTouch[ch] = 0;
         firstTouch[ch] = 0;
@@ -617,7 +617,7 @@ function calculateAllModels(marketingJourneys, allChannels) {
 
     // Calculate actual Last and First Touches across ALL actual paths
     marketingJourneys.forEach(j => {
-        const path = j.path; 
+        const path = j.path;
         const n = path.length;
         if (n > 0) {
             lastTouch[path[n - 1]] = (lastTouch[path[n - 1]] || 0) + 1;
@@ -635,8 +635,8 @@ function calculateAllModels(marketingJourneys, allChannels) {
         const n = p.length;
         if (n > 0) {
             firstCounts[p[0]] = (firstCounts[p[0]] || 0) + 1;
-            lastCounts[p[n-1]] = (lastCounts[p[n-1]] || 0) + 1;
-            for (let i = 1; i < n-1; i++) {
+            lastCounts[p[n - 1]] = (lastCounts[p[n - 1]] || 0) + 1;
+            for (let i = 1; i < n - 1; i++) {
                 middleCounts[p[i]] = (middleCounts[p[i]] || 0) + 1;
             }
         }
@@ -658,7 +658,7 @@ function calculateAllModels(marketingJourneys, allChannels) {
     const topLast = getTop(lastCounts, [topFirst]);
     let topMid1 = getTop(middleCounts, [topFirst, topLast]);
     let topMid2 = getTop(middleCounts, [topFirst, topLast, topMid1]);
-    
+
     const macroPath = [];
     if (topFirst) macroPath.push(topFirst);
     if (topMid1) macroPath.push(topMid1);
@@ -680,9 +680,9 @@ function calculateAllModels(marketingJourneys, allChannels) {
         macroUShape[macroPath[1]] = 50;
     } else if (macroN > 2) {
         macroUShape[macroPath[0]] = 40;
-        macroUShape[macroPath[macroN-1]] = 40;
+        macroUShape[macroPath[macroN - 1]] = 40;
         const midShare = 20 / (macroN - 2);
-        for(let i=1; i<macroN-1; i++){
+        for (let i = 1; i < macroN - 1; i++) {
             macroUShape[macroPath[i]] = midShare;
         }
     }
@@ -716,7 +716,7 @@ function calculateAllModels(marketingJourneys, allChannels) {
         uShape: macroUShape,
         lastTouch: toPercent(lastTouch),
         firstTouch: toPercent(firstTouch),
-        rawWeighted: Object.keys(macroWeighted).reduce((acc, k) => { acc[k] = (macroWeighted[k] * volume / 100); return acc; }, {}), 
+        rawWeighted: Object.keys(macroWeighted).reduce((acc, k) => { acc[k] = (macroWeighted[k] * volume / 100); return acc; }, {}),
         rawUShape: Object.keys(macroUShape).reduce((acc, k) => { acc[k] = (macroUShape[k] * volume / 100); return acc; }, {}),
         rawLastTouch: lastTouch,
         rawFirstTouch: firstTouch,
@@ -792,15 +792,30 @@ function renderSummaryCards(allChannels, marketingCount, topPaths) {
     document.getElementById('rAvgLength').textContent = avgLen.toFixed(1);
 }
 
-function renderModelResults(attribution, containerId, allChannels) {
+function renderModelResults(attribution, containerId, allChannels, macroPath = null) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const sortedKeys = Object.keys(attribution).sort((a, b) => attribution[b] - attribution[a]);
+    const nonZeroIds = Object.keys(attribution).filter(id => attribution[id] > 0);
 
-    if (sortedKeys.length === 0) {
-        container.innerHTML = '<div class="sim-empty-state"><div class="empty-icon">✨</div><div class="empty-text">Нет данных</div></div>';
+    if (nonZeroIds.length === 0) {
+        container.innerHTML = '<div class="sim-empty-state"><div class="empty-icon">✨</div><div class="empty-text">Нет данных или 0%</div></div>';
         return;
+    }
+
+    let sortedKeys;
+    if (macroPath && macroPath.length > 0) {
+        sortedKeys = nonZeroIds.sort((a, b) => {
+            const idxA = macroPath.indexOf(a);
+            const idxB = macroPath.indexOf(b);
+
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return attribution[b] - attribution[a]; // fallback
+        });
+    } else {
+        sortedKeys = nonZeroIds.sort((a, b) => attribution[b] - attribution[a]);
     }
 
     container.innerHTML = '';
@@ -828,10 +843,10 @@ function renderModelResults(attribution, containerId, allChannels) {
 }
 
 function renderAllModelResults(results, allChannels) {
-    renderModelResults(results.weighted, 'uploadWeightedResults', allChannels);
-    renderModelResults(results.uShape, 'uploadUShapeResults', allChannels);
-    renderModelResults(results.lastTouch, 'uploadLastTouchResults', allChannels);
-    renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels);
+    renderModelResults(results.weighted, 'uploadWeightedResults', allChannels, results.macroPath);
+    renderModelResults(results.uShape, 'uploadUShapeResults', allChannels, results.macroPath);
+    renderModelResults(results.lastTouch, 'uploadLastTouchResults', allChannels, results.macroPath);
+    renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels, results.macroPath);
 }
 
 function renderComparisonBars(results, allChannels) {
