@@ -656,13 +656,23 @@ function calculateAllModels(marketingJourneys, allChannels) {
 
     const topFirst = getTop(firstCounts);
     const topLast = getTop(lastCounts, [topFirst]);
-    let topMid1 = getTop(middleCounts, [topFirst, topLast]);
-    let topMid2 = getTop(middleCounts, [topFirst, topLast, topMid1]);
+
+    // Find up to 3 most popular middle channels
+    const used = [topFirst, topLast];
+    const topMid1 = getTop(middleCounts, used);
+    if (topMid1) used.push(topMid1);
+
+    const topMid2 = getTop(middleCounts, used);
+    if (topMid2) used.push(topMid2);
+
+    const topMid3 = getTop(middleCounts, used);
+    if (topMid3) used.push(topMid3);
 
     const macroPath = [];
     if (topFirst) macroPath.push(topFirst);
     if (topMid1) macroPath.push(topMid1);
-    // if (topMid2) macroPath.push(topMid2); // Optional: limits the macro journey to top 3 for clarity
+    if (topMid2) macroPath.push(topMid2);
+    if (topMid3) macroPath.push(topMid3);
     if (topLast) macroPath.push(topLast);
 
     const macroWeighted = {};
@@ -845,8 +855,10 @@ function renderModelResults(attribution, containerId, allChannels, macroPath = n
 function renderAllModelResults(results, allChannels) {
     renderModelResults(results.weighted, 'uploadWeightedResults', allChannels, results.macroPath);
     renderModelResults(results.uShape, 'uploadUShapeResults', allChannels, results.macroPath);
-    renderModelResults(results.lastTouch, 'uploadLastTouchResults', allChannels, results.macroPath);
-    renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels, results.macroPath);
+
+    // First and Last touch are rendered strictly by descending percentages (no macroPath specified)
+    renderModelResults(results.lastTouch, 'uploadLastTouchResults', allChannels);
+    renderModelResults(results.firstTouch, 'uploadFirstTouchResults', allChannels);
 }
 
 function renderComparisonBars(results, allChannels) {
