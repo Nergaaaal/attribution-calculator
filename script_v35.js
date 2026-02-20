@@ -156,32 +156,54 @@ function removeFromJourney(index) {
 function calculateWeightedScore() {
     if (journey.length === 0) return {};
 
-    let sum = 0;
-    const scores = journey.map(item => {
-        const ch = channels.find(c => c.id === item.id);
-        let s = ch ? ch.score : 0;
-        if (item.id === 'stories' && item.logicActive) s = 0;
-        if (item.id === 'offline' && item.logicActive) s = 2;
-        return s;
+    // 1. Sequential deduplication
+    const deduplicated = [];
+    journey.forEach(item => {
+        if (deduplicated.length === 0 || deduplicated[deduplicated.length - 1].id !== item.id) {
+            deduplicated.push(item);
+        }
     });
 
-    sum = scores.reduce((a, b) => a + b, 0);
+    // 2. Extract uniquely scored channels
+    const uniqueIds = [...new Set(deduplicated.map(j => j.id))];
+    let sum = 0;
+    
+    // get unique score sum
+    const channelVals = {};
+    uniqueIds.forEach(id => {
+        // find item representing this id logic
+        const item = deduplicated.find(i => i.id === id);
+        const ch = channels.find(c => c.id === id);
+        let s = ch ? ch.score : 0;
+        if (id === 'stories' && item.logicActive) s = 0;
+        if (id === 'offline' && item.logicActive) s = 2;
+        channelVals[id] = s;
+        sum += s;
+    });
+
     if (sum === 0) return {};
 
     const result = {};
-    journey.forEach((item, idx) => {
-        const score = scores[idx];
-        const share = (score / sum) * 100;
-        result[item.id] = (result[item.id] || 0) + share;
+    uniqueIds.forEach(id => {
+        const share = (channelVals[id] / sum) * 100;
+        result[id] = share;
     });
 
     return result;
 }
 
 function calculateUShape() {
+    // 1. Sequential deduplication
+    const deduplicated = [];
+    journey.forEach(item => {
+        if (deduplicated.length === 0 || deduplicated[deduplicated.length - 1].id !== item.id) {
+            deduplicated.push(item);
+        }
+    });
+
     // Only filter out Stories when its logic is active
     // Offline logic affects score, not position
-    const validItems = journey.filter(item => {
+    const validItems = deduplicated.filter(item => {
         if (item.id === 'stories' && item.logicActive) return false;
         return true;
     });
@@ -201,16 +223,28 @@ function calculateUShape() {
     } else {
         result[ids[0]] += 40;
         result[ids[n - 1]] += 40;
-        const middleShare = 20 / (n - 2);
-        for (let i = 1; i < n - 1; i++) {
-            result[ids[i]] += middleShare;
+        const middleIds = ids.slice(1, n - 1);
+        const uniqueMiddle = [...new Set(middleIds)];
+        if (uniqueMiddle.length > 0) {
+            const middleShare = 20 / uniqueMiddle.length;
+            uniqueMiddle.forEach(id => {
+                result[id] += middleShare;
+            });
         }
     }
     return result;
 }
 
 function calculateLastTouch() {
-    const validItems = journey.filter(item => {
+    // 1. Sequential deduplication
+    const deduplicated = [];
+    journey.forEach(item => {
+        if (deduplicated.length === 0 || deduplicated[deduplicated.length - 1].id !== item.id) {
+            deduplicated.push(item);
+        }
+    });
+
+    const validItems = deduplicated.filter(item => {
         if (item.id === 'stories' && item.logicActive) return false;
         return true;
     });
@@ -221,7 +255,15 @@ function calculateLastTouch() {
 }
 
 function calculateFirstTouch() {
-    const validItems = journey.filter(item => {
+    // 1. Sequential deduplication
+    const deduplicated = [];
+    journey.forEach(item => {
+        if (deduplicated.length === 0 || deduplicated[deduplicated.length - 1].id !== item.id) {
+            deduplicated.push(item);
+        }
+    });
+
+    const validItems = deduplicated.filter(item => {
         if (item.id === 'stories' && item.logicActive) return false;
         return true;
     });
@@ -506,33 +548,37 @@ function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
     });
 
     dataset.forEach(row => {
-        let path = [...row.path];
+        let rawPath = [...row.path];
+        let path = [];
+        if (rawPath.length > 0) {
+            path.push(rawPath[0]);
+            for (let i = 1; i < rawPath.length; i++) {
+                 if (rawPath[i] !== rawPath[i - 1]) path.push(rawPath[i]);
+            }
+        }
 
-        // --- 1. Weighted (Original Logic: just zero out score) ---
+        // --- 1. Weighted ---
+        const uniqueChannels = [...new Set(path)];
         let totalScore = 0;
-        const itemScores = path.map(channelId => {
+        const channelScoresMap = {};
+        uniqueChannels.forEach(channelId => {
             const chObj = channels.find(c => c.id === channelId);
             let score = chObj ? chObj.score : 1;
             if (useStoriesLogic && channelId === 'stories') score = 0;
             if (useOfflineLogic && channelId === 'offline') score = 2; // Penalty
-            return { id: channelId, score: score };
+            channelScoresMap[channelId] = score;
+            totalScore += score;
         });
 
-        const sumScores = itemScores.reduce((sum, item) => sum + item.score, 0);
-        if (sumScores > 0) {
-            itemScores.forEach(item => {
-                weightedTotals[item.id] += (item.score / sumScores);
+        if (totalScore > 0) {
+            uniqueChannels.forEach(channelId => {
+                weightedTotals[channelId] += (channelScoresMap[channelId] / totalScore);
             });
         }
 
         // --- 2. U-Shape & Last Touch (Filtered Path Logic) ---
-        // If Logic is ON, completely remove Stories/Offline from the path consideration for U-Shape/LT?
-        // User Request: "Story doesn't disappear in U-Shape".
-        // Interpretation: If Stories logic is ON, treat it as if it didn't exist in the chain for position-based models.
-
         let filteredPath = path.filter(id => {
             // Only Stories is excluded from U-Shape when logic is active
-            // Offline logic only affects score, not position
             if (useStoriesLogic && id === 'stories') return false;
             return true;
         });
@@ -552,9 +598,14 @@ function calculateThreeModels(dataset, useStoriesLogic, useOfflineLogic) {
             } else {
                 uShapeTotals[filteredPath[0]] += 0.4;
                 uShapeTotals[filteredPath[n - 1]] += 0.4;
-                const mid = 0.2 / (n - 2);
-                for (let k = 1; k < n - 1; k++) {
-                    uShapeTotals[filteredPath[k]] += mid;
+                
+                const middleIds = filteredPath.slice(1, n - 1);
+                const uniqueMiddle = [...new Set(middleIds)];
+                if (uniqueMiddle.length > 0) {
+                    const mid = 0.2 / uniqueMiddle.length;
+                    uniqueMiddle.forEach(id => {
+                        uShapeTotals[id] += mid;
+                    });
                 }
             }
         }

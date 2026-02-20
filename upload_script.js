@@ -611,16 +611,17 @@ function calculateAllModels(marketingJourneys, allChannels) {
         if (n === 0) return;
 
         // Weighted Score
+        const uniqueChannels = [...new Set(path)];
         let totalScore = 0;
-        const scores = path.map(ch => {
-            const s = channelScores[ch] !== undefined ? channelScores[ch] : DEFAULT_SCORE;
-            totalScore += s;
-            return s;
+
+        uniqueChannels.forEach(ch => {
+            totalScore += channelScores[ch] !== undefined ? channelScores[ch] : DEFAULT_SCORE;
         });
 
         if (totalScore > 0) {
-            path.forEach((ch, idx) => {
-                weighted[ch] = (weighted[ch] || 0) + (scores[idx] / totalScore);
+            uniqueChannels.forEach(ch => {
+                const s = channelScores[ch] !== undefined ? channelScores[ch] : DEFAULT_SCORE;
+                weighted[ch] = (weighted[ch] || 0) + (s / totalScore);
             });
         }
 
@@ -634,17 +635,20 @@ function calculateAllModels(marketingJourneys, allChannels) {
         if (n === 1) {
             uShape[path[0]] = (uShape[path[0]] || 0) + 1;
         } else if (n === 2) {
-            // Split 50/50 if only 2 touchpoints (or should it be 40/40 and 20 lost? Standard is usually 50/50 or 40/40/20 normalized)
-            // User asked for: "40% First, 40% Last, 20% Middle".
-            // If n=2, there is no middle. 40+40=80. Normalized -> 50/50.
             uShape[path[0]] = (uShape[path[0]] || 0) + 0.5;
             uShape[path[1]] = (uShape[path[1]] || 0) + 0.5;
         } else {
             uShape[path[0]] = (uShape[path[0]] || 0) + 0.4;
             uShape[path[n - 1]] = (uShape[path[n - 1]] || 0) + 0.4;
-            const midShare = 0.2 / (n - 2);
-            for (let k = 1; k < n - 1; k++) {
-                uShape[path[k]] = (uShape[path[k]] || 0) + midShare;
+
+            const middleTouches = path.slice(1, n - 1);
+            const uniqueMiddle = [...new Set(middleTouches)];
+
+            if (uniqueMiddle.length > 0) {
+                const midShare = 0.2 / uniqueMiddle.length;
+                uniqueMiddle.forEach(ch => {
+                    uShape[ch] = (uShape[ch] || 0) + midShare;
+                });
             }
         }
     });
