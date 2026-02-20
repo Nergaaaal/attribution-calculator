@@ -523,57 +523,71 @@ function runAnalysis() {
 function buildJourneys() {
     journeys = [];
 
-    // Build lookup: CLI_CODE → DT_OPEN
-    const loanMap = {};
-    cashLoanData.forEach(loan => {
-        if (!loanMap[loan.cliCode] || loan.dtOpen < loanMap[loan.cliCode]) {
-            loanMap[loan.cliCode] = loan.dtOpen;
-        }
-    });
-
-    console.log(`Loan map: ${Object.keys(loanMap).length} unique clients`);
-
     // Group channel events by client
     const clientEvents = {};
     channelEvents.forEach(evt => {
-        if (!loanMap[evt.cliCode]) return;
-        const dtOpen = loanMap[evt.cliCode];
-
-        if (evt.date >= dtOpen) return;
-
         if (!clientEvents[evt.cliCode]) clientEvents[evt.cliCode] = [];
         clientEvents[evt.cliCode].push(evt);
     });
 
-    // Build paths for ALL clients in loanMap
-    Object.keys(loanMap).forEach(clientId => {
-        const events = clientEvents[clientId] || [];
+    Object.keys(clientEvents).forEach(cli => {
+        clientEvents[cli].sort((a, b) => a.date - b.date);
+    });
 
-        // Sort by date
-        events.sort((a, b) => a.date - b.date);
+    // Group loans by client
+    const clientLoans = {};
+    cashLoanData.forEach(loan => {
+        if (!clientLoans[loan.cliCode]) clientLoans[loan.cliCode] = [];
+        clientLoans[loan.cliCode].push(loan);
+    });
+
+    Object.keys(clientLoans).forEach(cli => {
+        clientLoans[cli].sort((a, b) => a.dtOpen - b.dtOpen);
+    });
+
+    cashLoanData.forEach(loan => {
+        const cliEvents = clientEvents[loan.cliCode] || [];
+        
+        // Include events up to the end of the loan day if no time is provided
+        let cutoff = new Date(loan.dtOpen.getTime());
+        if (cutoff.getHours() === 0 && cutoff.getMinutes() === 0 && cutoff.getSeconds() === 0) {
+            cutoff.setHours(23, 59, 59, 999);
+        }
+
+        // Only consider events strictly after the previous loan (if any)
+        const cLoans = clientLoans[loan.cliCode];
+        const thisLoanIdx = cLoans.indexOf(loan);
+        let startWindow = new Date(0);
+        if (thisLoanIdx > 0) {
+            startWindow = new Date(cLoans[thisLoanIdx - 1].dtOpen.getTime());
+            if (startWindow.getHours() === 0 && startWindow.getMinutes() === 0) {
+                startWindow.setHours(23, 59, 59, 999);
+            }
+        }
+
+        const validEvents = cliEvents.filter(e => e.date <= cutoff && e.date > startWindow);
+        validEvents.sort((a, b) => a.date - b.date);
 
         // Raw path
-        let rawPath = events.map(e => e.channel);
+        const rawPath = validEvents.map(e => e.channel);
 
-        // Deduplicate consecutive identical channels
-        // e.g. [Push, Push, SMS, SMS, Push] -> [Push, SMS, Push]
-        const simplePath = [];
+        // Deduplicate consecutive
+        const path = [];
         if (rawPath.length > 0) {
-            simplePath.push(rawPath[0]);
+            path.push(rawPath[0]);
             for (let i = 1; i < rawPath.length; i++) {
                 if (rawPath[i] !== rawPath[i - 1]) {
-                    simplePath.push(rawPath[i]);
+                    path.push(rawPath[i]);
                 }
             }
         }
 
-        // If simplePath is empty, it's Organic
         journeys.push({
-            clientId,
-            path: simplePath, // used for attribution
-            rawPath: rawPath, // kept just in case
-            dtOpen: loanMap[clientId],
-            isOrganic: simplePath.length === 0
+            clientId: loan.cliCode,
+            path: path,
+            rawPath: rawPath,
+            dtOpen: loan.dtOpen,
+            isOrganic: path.length === 0
         });
     });
 
@@ -593,65 +607,97 @@ function getUniqueChannels() {
 // ---- ATTRIBUTION CALCULATIONS ----
 
 function calculateAllModels(marketingJourneys, allChannels) {
-    const weighted = {};
-    const uShape = {};
     const lastTouch = {};
     const firstTouch = {};
-
+    
     allChannels.forEach(ch => {
-        weighted[ch] = 0;
-        uShape[ch] = 0;
         lastTouch[ch] = 0;
         firstTouch[ch] = 0;
     });
 
+    // Calculate actual Last and First Touches across ALL actual paths
     marketingJourneys.forEach(j => {
-        const path = j.path; // already deduplicated
+        const path = j.path; 
         const n = path.length;
-        if (n === 0) return;
-
-        // Weighted Score
-        const uniqueChannels = [...new Set(path)];
-        let totalScore = 0;
-
-        uniqueChannels.forEach(ch => {
-            totalScore += channelScores[ch] !== undefined ? channelScores[ch] : DEFAULT_SCORE;
-        });
-
-        if (totalScore > 0) {
-            uniqueChannels.forEach(ch => {
-                const s = channelScores[ch] !== undefined ? channelScores[ch] : DEFAULT_SCORE;
-                weighted[ch] = (weighted[ch] || 0) + (s / totalScore);
-            });
+        if (n > 0) {
+            lastTouch[path[n - 1]] = (lastTouch[path[n - 1]] || 0) + 1;
+            firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
         }
+    });
 
-        // Last Touch
-        lastTouch[path[n - 1]] = (lastTouch[path[n - 1]] || 0) + 1;
+    // Macro Path Logic (Archetypal Sequence from typical frequencies)
+    const firstCounts = {};
+    const lastCounts = {};
+    const middleCounts = {};
 
-        // First Touch
-        firstTouch[path[0]] = (firstTouch[path[0]] || 0) + 1;
-
-        // U-Shape: 40% first, 40% last, 20% middle
-        if (n === 1) {
-            uShape[path[0]] = (uShape[path[0]] || 0) + 1;
-        } else if (n === 2) {
-            uShape[path[0]] = (uShape[path[0]] || 0) + 0.5;
-            uShape[path[1]] = (uShape[path[1]] || 0) + 0.5;
-        } else {
-            uShape[path[0]] = (uShape[path[0]] || 0) + 0.4;
-            uShape[path[n - 1]] = (uShape[path[n - 1]] || 0) + 0.4;
-
-            const middleTouches = path.slice(1, n - 1);
-            const uniqueMiddle = [...new Set(middleTouches)];
-
-            if (uniqueMiddle.length > 0) {
-                const midShare = 0.2 / uniqueMiddle.length;
-                uniqueMiddle.forEach(ch => {
-                    uShape[ch] = (uShape[ch] || 0) + midShare;
-                });
+    marketingJourneys.forEach(j => {
+        const p = j.path;
+        const n = p.length;
+        if (n > 0) {
+            firstCounts[p[0]] = (firstCounts[p[0]] || 0) + 1;
+            lastCounts[p[n-1]] = (lastCounts[p[n-1]] || 0) + 1;
+            for (let i = 1; i < n-1; i++) {
+                middleCounts[p[i]] = (middleCounts[p[i]] || 0) + 1;
             }
         }
     });
+
+    const getTop = (counts, exclude = []) => {
+        let topCh = null;
+        let max = -1;
+        Object.keys(counts).forEach(ch => {
+            if (!exclude.includes(ch) && counts[ch] > max) {
+                max = counts[ch];
+                topCh = ch;
+            }
+        });
+        return topCh;
+    };
+
+    const topFirst = getTop(firstCounts);
+    const topLast = getTop(lastCounts, [topFirst]);
+    let topMid1 = getTop(middleCounts, [topFirst, topLast]);
+    let topMid2 = getTop(middleCounts, [topFirst, topLast, topMid1]);
+    
+    const macroPath = [];
+    if (topFirst) macroPath.push(topFirst);
+    if (topMid1) macroPath.push(topMid1);
+    // if (topMid2) macroPath.push(topMid2); // Optional: limits the macro journey to top 3 for clarity
+    if (topLast) macroPath.push(topLast);
+
+    const macroWeighted = {};
+    const macroUShape = {};
+    allChannels.forEach(ch => {
+        macroWeighted[ch] = 0;
+        macroUShape[ch] = 0;
+    });
+
+    const macroN = macroPath.length;
+    if (macroN === 1) {
+        macroUShape[macroPath[0]] = 100;
+    } else if (macroN === 2) {
+        macroUShape[macroPath[0]] = 50;
+        macroUShape[macroPath[1]] = 50;
+    } else if (macroN > 2) {
+        macroUShape[macroPath[0]] = 40;
+        macroUShape[macroPath[macroN-1]] = 40;
+        const midShare = 20 / (macroN - 2);
+        for(let i=1; i<macroN-1; i++){
+            macroUShape[macroPath[i]] = midShare;
+        }
+    }
+
+    // Default macro score if undefined fallback to 1
+    let macroTotalScore = 0;
+    macroPath.forEach(ch => {
+        macroTotalScore += (channelScores[ch] !== undefined ? channelScores[ch] : 1);
+    });
+    if (macroTotalScore > 0) {
+        macroPath.forEach(ch => {
+            const s = channelScores[ch] !== undefined ? channelScores[ch] : 1;
+            macroWeighted[ch] = (s / macroTotalScore) * 100;
+        });
+    }
 
     const toPercent = (obj) => {
         const total = Object.values(obj).reduce((a, b) => a + b, 0);
@@ -664,15 +710,17 @@ function calculateAllModels(marketingJourneys, allChannels) {
         return result;
     };
 
+    const volume = marketingJourneys.length;
     return {
-        weighted: toPercent(weighted),
-        uShape: toPercent(uShape),
+        weighted: macroWeighted,
+        uShape: macroUShape,
         lastTouch: toPercent(lastTouch),
         firstTouch: toPercent(firstTouch),
-        rawWeighted: weighted,
-        rawUShape: uShape,
+        rawWeighted: Object.keys(macroWeighted).reduce((acc, k) => { acc[k] = (macroWeighted[k] * volume / 100); return acc; }, {}), 
+        rawUShape: Object.keys(macroUShape).reduce((acc, k) => { acc[k] = (macroUShape[k] * volume / 100); return acc; }, {}),
         rawLastTouch: lastTouch,
-        rawFirstTouch: firstTouch
+        rawFirstTouch: firstTouch,
+        macroPath: macroPath
     };
 }
 
@@ -906,6 +954,10 @@ function renderInsight(results, allChannels, marketingCount) {
         const topCh = Object.keys(results.weighted).sort((a, b) => results.weighted[b] - results.weighted[a])[0];
         if (topCh) {
             text += `<br><br>🏆 <b>Лидер влияния:</b> ${getChannelLabel(topCh)} (${results.weighted[topCh].toFixed(1)}% вклада).`;
+        }
+
+        if (results.macroPath && results.macroPath.length > 0) {
+            text += `<br><br>🌟 <b>Архетип пути (из частых посещений):</b> <code>${results.macroPath.filter(c => c).map(ch => getChannelLabel(ch)).join(' → ')}</code>. <br><i>U-Shape и Weighted Score построены именно по этому типичному пути (разделение 40/20/40).</i>`;
         }
     }
 
